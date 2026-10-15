@@ -28,16 +28,18 @@ interface BootSequenceProps {
 
 export function BootSequence({ onDone, instant = false }: BootSequenceProps) {
   const [shown, setShown] = useState(instant ? BOOT_LINES.length : 0);
+  const finished = shown >= BOOT_LINES.length;
 
   // 一定間隔で行を増やす（interval 型なので偽タイマーのテストとも相性が良い）
+  // 全行出し切ったらタイマーを残さない
   useEffect(() => {
-    if (instant) return;
+    if (instant || finished) return;
     const id = setInterval(
       () => setShown((n) => Math.min(n + 1, BOOT_LINES.length)),
       LINE_INTERVAL,
     );
     return () => clearInterval(id);
-  }, [instant]);
+  }, [instant, finished]);
 
   // 全行出し切ったら余韻を置いて終了
   useEffect(() => {
@@ -55,18 +57,21 @@ export function BootSequence({ onDone, instant = false }: BootSequenceProps) {
     >
       <div className="space-y-2 font-mono-hud text-xs leading-relaxed text-hud-gold sm:text-sm">
         {BOOT_LINES.slice(0, shown).map((line, i) => (
-          <p key={i} className="beat-in">
+          <span key={i} className="beat-in block">
             <span className="mr-2 text-hud-gold-dim">&gt;</span>
             {line}
-          </p>
+          </span>
         ))}
         {shown < BOOT_LINES.length && (
-          <p className="type-caret text-hud-gold" aria-hidden="true" />
+          <span
+            className="type-caret block text-hud-gold"
+            aria-hidden="true"
+          />
         )}
       </div>
-      <p className="mt-10 font-mono-hud text-[9px] tracking-[0.3em] text-hud-text-muted/60">
+      <span className="mt-10 block font-mono-hud text-[9px] tracking-[0.3em] text-hud-text-muted/60">
         TAP TO SKIP
-      </p>
+      </span>
     </button>
   );
 }

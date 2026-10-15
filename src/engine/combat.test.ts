@@ -49,6 +49,14 @@ describe("combat", () => {
     expect(s.phase).toBe("enemy-resolved");
   });
 
+  it("player-turn フェイズでは敵攻撃の解決を無視する（二重呼び出し防止）", () => {
+    // UI から evade-prompt 以外で呼ばれても state をそのまま返す
+    const s = createCombat();
+    expect(s.phase).toBe("player-turn");
+    expect(resolveEnemyAttack(s, true)).toBe(s);
+    expect(resolveEnemyAttack(s, false)).toBe(s);
+  });
+
   it("敵の攻撃で ZS が尽きると lost になる", () => {
     // プレイヤーは全弾外し、敵は全弾命中（出目1）する想定
     let s = playerAttack(createCombat(), "slash", ALL_MISS);

@@ -3,7 +3,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BootSequence } from "./BootSequence";
 import { Narration } from "./Narration";
@@ -68,6 +68,53 @@ describe("Narration（タイプライター）", () => {
     );
     expect(screen.getByText("あいうえおかきくけこ")).toBeInTheDocument();
     expect(onRevealed).toHaveBeenCalled();
+  });
+
+  it("Enter キーで全文スキップになる", async () => {
+    const onRevealed = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Narration
+        paragraphs={["あいうえおかきくけこ"]}
+        onRevealed={onRevealed}
+      />,
+    );
+    const region = screen.getByRole("button", { name: "全文を表示する" });
+    region.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByText("あいうえおかきくけこ")).toBeInTheDocument();
+    expect(onRevealed).toHaveBeenCalled();
+  });
+
+  it("paragraphs を差し替えるとタイピングが最初からやり直しになる", async () => {
+    const onRevealed = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <Narration paragraphs={["あいうえお"]} onRevealed={onRevealed} />,
+    );
+    // まず全文を出し切る
+    await user.click(
+      screen.getByRole("button", { name: "全文を表示する" }),
+    );
+    expect(screen.getByText("あいうえお")).toBeInTheDocument();
+    expect(onRevealed).toHaveBeenCalledTimes(1);
+
+    // 別の paragraphs に差し替えると表示がリセットされて出直しになる
+    rerender(
+      <Narration paragraphs={["かきくけこ"]} onRevealed={onRevealed} />,
+    );
+    expect(screen.queryByText("あいうえお")).not.toBeInTheDocument();
+    expect(screen.queryByText("かきくけこ")).not.toBeInTheDocument();
+    // タイピング中なのでスキップ領域（button）も復活している
+    expect(
+      screen.getByRole("button", { name: "全文を表示する" }),
+    ).toBeInTheDocument();
+
+    // タイピングが最初から走り直し、出し切ると onRevealed が再度呼ばれる
+    await waitFor(() => expect(onRevealed).toHaveBeenCalledTimes(2), {
+      timeout: 3000,
+    });
+    expect(screen.getByText("かきくけこ")).toBeInTheDocument();
   });
 
   it("loading 中は解析中の表示になる", () => {

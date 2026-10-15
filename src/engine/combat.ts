@@ -127,7 +127,8 @@ export function playerAttack(
     });
     const committed: CombatState = { ...state, charging: true, log };
     // 突入中は回避できないので、そのまま敵の攻撃を無回避で解決する
-    return resolveEnemyAttack(committed, false, rng);
+    // （phase は player-turn のままなので内部関数を直接呼ぶ）
+    return resolveIncoming(committed, false, rng);
   }
 
   // ── 通常攻撃／ダブルトリガー／チャージ解放 ──
@@ -205,14 +206,29 @@ export function playerAttack(
   };
 
   // 座標攻撃（回避不可）はそのまま敵の攻撃を解決する
+  // （phase は既に enemy-resolved なので内部関数を直接呼ぶ）
   if (next.phase === "enemy-resolved") {
-    return resolveEnemyAttack(next, false, rng);
+    return resolveIncoming(next, false, rng);
   }
   return next;
 }
 
-/** 敵の攻撃を解決する。evade = ジグスラストで回避を試みる */
+/**
+ * 敵の攻撃を解決する。evade = ジグスラストで回避を試みる。
+ * evade-prompt フェイズ以外から呼ばれても何もしない（UI の二重呼び出し防止）。
+ * 内部からの解決は resolveIncoming を使う。
+ */
 export function resolveEnemyAttack(
+  state: CombatState,
+  evade: boolean,
+  rng?: Rng,
+): CombatState {
+  if (state.phase !== "evade-prompt") return state;
+  return resolveIncoming(state, evade, rng);
+}
+
+/** 敵の攻撃の実際の解決処理（フェイズを問わず playerAttack からも呼ばれる） */
+function resolveIncoming(
   state: CombatState,
   evade: boolean,
   rng?: Rng,

@@ -10,17 +10,32 @@ interface NarrationProps {
   onRevealed?: () => void;
 }
 
-const MAX_MS_PER_PARAGRAPH = 2800;
+const MAX_MS_PER_PARAGRAPH = 2200;
 const PARAGRAPH_PAUSE = 220;
 
 function useReducedMotion(): boolean {
-  return useMemo(
+  const [reduced, setReduced] = useState(
     () =>
       typeof window !== "undefined" &&
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    [],
   );
+
+  // OS/ブラウザの設定変更にも追従する
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  return reduced;
 }
 
 /**
@@ -48,13 +63,20 @@ export function Narration({
     return { total: acc, boundaries: bounds };
   }, [paragraphs]);
 
-  // 一番長い段落が 3 秒以内に出きる速度にする
+  // 一番長い段落でも MAX_MS_PER_PARAGRAPH 以内に出きる速度にする
   const interval = useMemo(() => {
     const maxLen = Math.max(1, ...paragraphs.map((p) => p.length));
     return Math.min(55, Math.max(12, Math.floor(MAX_MS_PER_PARAGRAPH / maxLen)));
   }, [paragraphs]);
 
   const done = count >= total;
+
+  // 段落が差し替わったらタイピングを最初からやり直す
+  // （同じ配列参照が続く限りこの effect は走らず、タイピングは継続する）
+  useEffect(() => {
+    setCount(0);
+    revealedRef.current = false;
+  }, [paragraphs]);
 
   useEffect(() => {
     if (loading || total === 0) return;
@@ -95,10 +117,25 @@ export function Narration({
   let remaining = count;
   return (
     <div
-      className="space-y-4"
+      className={
+        done
+          ? "space-y-4"
+          : "space-y-4 rounded-sm focus:outline-none focus:ring-1 focus:ring-hud-gold/50"
+      }
       onClick={() => setCount(total)}
+      onKeyDown={
+        done
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault(); // Space によるスクロールを防ぐ
+                setCount(total);
+              }
+            }
+      }
       role={done ? undefined : "button"}
       aria-label={done ? undefined : "全文を表示する"}
+      tabIndex={done ? undefined : 0}
     >
       {paragraphs.map((p, i) => {
         const shown = Math.max(0, Math.min(p.length, remaining));

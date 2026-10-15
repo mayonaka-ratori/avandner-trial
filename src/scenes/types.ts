@@ -8,10 +8,22 @@
  */
 
 export interface ChoiceOption {
+  /** 選択肢の識別子。同一シーン内で一意。endingExtras などの判定に使う */
+  id: string;
   /** ボタンの表示 */
   label: string;
   /** 選んだあとに差し込む応答文（段落の配列） */
   response: string[];
+}
+
+/** プレイヤーの選択・発言の記録。endingExtras の判定とエンディング API への素材に使う */
+export interface ChoiceRecord {
+  /** どのシーンでの記録か */
+  sceneId: string;
+  /** choice の場合は選択肢の id。free 入力では undefined */
+  optionId?: string;
+  /** 人が読める記録（選択肢ラベル or 入力文）。エンディング API の素材 */
+  label: string;
 }
 
 export type Interaction =

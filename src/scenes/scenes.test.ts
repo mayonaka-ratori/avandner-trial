@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FIRST_SCENE, SCENES, SCENE_MAP } from "./scenes";
+import { endingExtras, FIRST_SCENE, SCENES, SCENE_MAP } from "./scenes";
 import { SCENE_PROMPTS } from "../../api/narrate";
+import type { ChoiceRecord } from "./types";
 
 describe("シーン定義", () => {
   it("最初のシーンが存在する", () => {
@@ -30,6 +31,18 @@ describe("シーン定義", () => {
         for (const opt of scene.interaction.options) {
           expect(opt.response.length, `${scene.id}/${opt.label}`).toBeGreaterThan(0);
         }
+      }
+    }
+  });
+
+  it("同じシーン内で選択肢の id が重複していない", () => {
+    for (const scene of SCENES) {
+      if (scene.interaction.type === "choice") {
+        const ids = scene.interaction.options.map((opt) => opt.id);
+        for (const id of ids) {
+          expect(id.trim().length, `${scene.id} の空の id`).toBeGreaterThan(0);
+        }
+        expect(new Set(ids).size, scene.id).toBe(ids.length);
       }
     }
   });
@@ -78,5 +91,32 @@ describe("シーン定義", () => {
     }
     expect(visited.has("ending")).toBe(true);
     expect(visited.size).toBe(SCENES.length);
+  });
+});
+
+describe("endingExtras", () => {
+  it("gabriella で dismiss を選ぶと「流した噂」の追記文が入る", () => {
+    const log: ChoiceRecord[] = [
+      {
+        sceneId: "gabriella",
+        optionId: "dismiss",
+        label: "胡散臭い話だ。流そう",
+      },
+    ];
+    const extras = endingExtras(log, "won");
+    expect(extras.some((p) => p.includes("流した噂"))).toBe(true);
+  });
+
+  it("自由入力に「流そう」が含まれても誤発火しない", () => {
+    const log: ChoiceRecord[] = [
+      { sceneId: "awakening", label: "噂は流そうと思う" },
+    ];
+    const extras = endingExtras(log, "won");
+    expect(extras.some((p) => p.includes("流した噂"))).toBe(false);
+  });
+
+  it("lost-then-won では敗北の追記文が入る", () => {
+    const extras = endingExtras([], "lost-then-won");
+    expect(extras.length).toBeGreaterThan(0);
   });
 });

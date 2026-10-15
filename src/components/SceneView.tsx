@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Send } from "lucide-react";
-import type { SceneDef } from "@/scenes/types";
+import type { ChoiceOption, ChoiceRecord, SceneDef } from "@/scenes/types";
 import { narrate } from "@/api/client";
 import { endingExtras } from "@/scenes/scenes";
 import { Narration } from "./Narration";
@@ -11,9 +11,9 @@ const INSTANT_TEXT = import.meta.env.MODE === "test";
 interface SceneViewProps {
   scene: SceneDef;
   /** 進む。choice / free でプレイヤーが入力した内容を記録するための引数 */
-  onAdvance: (record?: string) => void;
+  onAdvance: (record?: ChoiceRecord) => void;
   /** エンディングの総括用にこれまでの選択履歴を渡す */
-  choiceLog?: string[];
+  choiceLog?: ChoiceRecord[];
   battleResult?: "won" | "lost-then-won";
   /** 体験開始時刻。エンディングの経過時間表示に使う */
   startedAt?: number;
@@ -39,7 +39,7 @@ export function SceneView({
 }: SceneViewProps) {
   const [text, setText] = useState<string[] | null>(null);
   const [revealed, setRevealed] = useState(false);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<ChoiceRecord | null>(null);
   const [response, setResponse] = useState<string[]>([]);
   const [responseRevealed, setResponseRevealed] = useState(false);
   const [freeSent, setFreeSent] = useState(false);
@@ -71,7 +71,9 @@ export function SceneView({
       return;
     }
     narrate(scene.narrationKey, {
-      choices: scene.id === "ending" ? choiceLog : undefined,
+      // API には構造を送らず、人が読める label だけ渡す
+      choices:
+        scene.id === "ending" ? choiceLog?.map((c) => c.label) : undefined,
       battleResult: scene.id === "ending" ? battleResult : undefined,
     }).then((generated) => {
       if (cancelled) return;
@@ -118,10 +120,10 @@ export function SceneView({
     setBusy(false);
   }
 
-  function pick(label: string, res: string[]) {
-    setPicked(label);
+  function pick(opt: ChoiceOption) {
+    setPicked({ sceneId: scene.id, optionId: opt.id, label: opt.label });
     setResponseRevealed(false);
-    setResponse(res);
+    setResponse(opt.response);
   }
 
   return (
@@ -162,8 +164,8 @@ export function SceneView({
         <div className="mt-2 space-y-3">
           {it.options.map((opt, i) => (
             <button
-              key={i}
-              onClick={() => pick(opt.label, opt.response)}
+              key={opt.id}
+              onClick={() => pick(opt)}
               className="beat-in block w-full rounded-md border border-hud-border bg-hud-panel px-4 py-3 text-left text-sm leading-relaxed text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
               style={{ animationDelay: `${i * 120}ms` }}
             >
@@ -215,7 +217,13 @@ export function SceneView({
 
       {ready && it.type === "free" && freeSent && (
         <ContinueButton
-          onClick={() => onAdvance(freeText.trim() || undefined)}
+          onClick={() =>
+            onAdvance(
+              freeText.trim()
+                ? { sceneId: scene.id, label: freeText.trim() }
+                : undefined,
+            )
+          }
         />
       )}
 
@@ -250,7 +258,7 @@ function EndingExtras({
   startedAt,
 }: {
   onRestart: () => void;
-  choiceLog: string[];
+  choiceLog: ChoiceRecord[];
   battleResult: "won" | "lost-then-won";
   startedAt?: number;
 }) {
@@ -276,7 +284,7 @@ function EndingExtras({
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt>選択の記録</dt>
+            <dt>選択・発言の記録</dt>
             <dd className="text-hud-text">{choiceLog.length} 件</dd>
           </div>
           {elapsedMin !== null && (

@@ -9,7 +9,7 @@
  * ここだけで最後まで遊べることがフォールバック設計の要。
  */
 
-import type { SceneDef } from "./types";
+import type { ChoiceRecord, SceneDef } from "./types";
 
 export const FIRST_SCENE = "awakening";
 
@@ -67,6 +67,7 @@ export const SCENES: SceneDef[] = [
       type: "choice",
       options: [
         {
+          id: "tease-excited",
           label: "「お兄ちゃんに会うのが楽しみなんだね」",
           response: [
             "「いえ！　お魚が楽しみなんです！　お兄ちゃんに会うのは二の次です！」",
@@ -75,6 +76,7 @@ export const SCENES: SceneDef[] = [
           ],
         },
         {
+          id: "wish-safety",
           label: "「装甲列車か。無事に帰るといいな」",
           response: [
             "「ですよねー！　イーフェとの交易路、最近物騒らしいですから」",
@@ -101,6 +103,7 @@ export const SCENES: SceneDef[] = [
       type: "choice",
       options: [
         {
+          id: "investigate",
           label: "噂が気になる。裏を取ってみよう",
           response: [
             "企業コネクションを辿って調べると、話は本当らしい。Ｃ３とイーフェの中間点、ローザ渓谷に、イデアグロリア所有のエグゾーストフォートレス「ザイラ」が三ヶ月前から隠されている。",
@@ -108,6 +111,7 @@ export const SCENES: SceneDef[] = [
           ],
         },
         {
+          id: "dismiss",
           label: "胡散臭い話だ。流そう",
           response: [
             "出所不明の女の話だ。真に受けるほうがどうかしている。",
@@ -135,12 +139,14 @@ export const SCENES: SceneDef[] = [
       type: "choice",
       options: [
         {
+          id: "accept",
           label: "引き受ける",
           response: [
             "「ありがとうございます。細かな作戦プランはお任せします。事態は急を要します。迅速な作戦遂行を、よろしくお願いしますね」",
           ],
         },
         {
+          id: "stella-brother",
           label: "……あの列車には、ステラの兄が乗っている",
           response: [
             "あの明るい声が、くず鉄と一緒に消えるわけにはいかない。",
@@ -206,11 +212,17 @@ export const SCENES: SceneDef[] = [
  * プレイヤーが歩んだ道を一文だけ振り返る。
  */
 export function endingExtras(
-  choiceLog: string[],
+  choiceLog: ChoiceRecord[],
   battleResult: "won" | "lost-then-won",
 ): string[] {
   const extras: string[] = [];
-  if (choiceLog.some((c) => c.includes("流そう"))) {
+  // ラベル文言ではなく sceneId + optionId で判定する。
+  // 文言変更に強く、自由入力に「流そう」が含まれても誤発火しない
+  if (
+    choiceLog.some(
+      (c) => c.sceneId === "gabriella" && c.optionId === "dismiss",
+    )
+  ) {
     extras.push(
       "あのとき流した噂は、本当だった。だが、間に合った。それで十分だ。",
     );

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { checkStatus } from "@/api/client";
 import { FIRST_SCENE, getScene } from "@/scenes/scenes";
+import type { ChoiceRecord } from "@/scenes/types";
 import { TitleScreen } from "@/components/TitleScreen";
 import { SceneView } from "@/components/SceneView";
 import { BattleView } from "@/components/BattleView";
@@ -11,13 +12,29 @@ type Phase = "checking" | "title" | "boot" | "playing" | "closed";
 
 interface PlayState {
   sceneId: string;
-  choiceLog: string[];
+  choiceLog: ChoiceRecord[];
   battleResult: "won" | "lost-then-won";
   /** 体験開始時刻（エンディングの経過時間表示用） */
   startedAt: number;
 }
 
 const SAVE_KEY = "avandnar-trial-save";
+
+/** choiceLog の1要素を ChoiceRecord に正規化する。変換できなければ null */
+function toChoiceRecord(c: unknown): ChoiceRecord | null {
+  // 旧形式（素の文字列）は sceneId 不明のまま label だけ拾う
+  if (typeof c === "string") return { sceneId: "", label: c };
+  if (c === null || typeof c !== "object") return null;
+  const rec = c as Partial<ChoiceRecord>;
+  if (typeof rec.sceneId !== "string" || typeof rec.label !== "string") {
+    return null;
+  }
+  return {
+    sceneId: rec.sceneId,
+    label: rec.label,
+    ...(typeof rec.optionId === "string" ? { optionId: rec.optionId } : {}),
+  };
+}
 
 function loadSave(): PlayState | null {
   try {
@@ -29,7 +46,10 @@ function loadSave(): PlayState | null {
     return {
       sceneId: data.sceneId,
       choiceLog: Array.isArray(data.choiceLog)
-        ? data.choiceLog.filter((c): c is string => typeof c === "string")
+        ? data.choiceLog.flatMap((c) => {
+            const rec = toChoiceRecord(c);
+            return rec ? [rec] : [];
+          })
         : [],
       battleResult: data.battleResult === "lost-then-won" ? "lost-then-won" : "won",
       startedAt: typeof data.startedAt === "number" ? data.startedAt : Date.now(),
@@ -89,7 +109,7 @@ export default function App() {
   }, [saved]);
 
   const advance = useCallback(
-    (nextSceneId: string, record?: string) => {
+    (nextSceneId: string, record?: ChoiceRecord) => {
       setPlay((prev) => {
         const next = {
           ...prev,

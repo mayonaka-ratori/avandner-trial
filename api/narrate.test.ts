@@ -134,4 +134,32 @@ describe("api/narrate", () => {
     const res = await handler(req({ scene: "awakening" }, headers));
     expect(res.status).toBe(429);
   });
+
+  it("先頭の IP を偽装しても末尾が同じなら同じバケットで数える", async () => {
+    // 実クライアント IP は x-forwarded-for の末尾。先頭を毎回変えても
+    // 末尾が "203.0.113.100" なら同一 IP のバケットに入る
+    for (let i = 0; i < 30; i++) {
+      const res = await handler(
+        req(
+          { scene: "awakening" },
+          { "x-forwarded-for": `10.0.0.${i}, 203.0.113.100` },
+        ),
+      );
+      expect(res.status).toBe(200);
+    }
+    // 31回目：先頭だけ変えた偽装でも末尾が同じなら 429
+    const res = await handler(
+      req(
+        { scene: "awakening" },
+        { "x-forwarded-for": "9.9.9.9, 203.0.113.100" },
+      ),
+    );
+    expect(res.status).toBe(429);
+
+    // 末尾が違う IP は別バケットなので 200 が返る
+    const other = await handler(
+      req({ scene: "awakening" }, { "x-forwarded-for": "203.0.113.101" }),
+    );
+    expect(other.status).toBe(200);
+  });
 });

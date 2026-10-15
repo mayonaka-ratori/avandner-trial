@@ -84,18 +84,36 @@ function report(name: string, r: SimResult) {
 
 describe("戦闘バランス（500試行ずつ）", () => {
   it("各戦法の勝率とラウンド数", () => {
-    report("通常攻撃・回避あり", simulate(() => "slash", () => true));
-    report("通常攻撃・回避なし", simulate(() => "slash", () => false));
-    report("ダブルトリガー・回避あり", simulate(() => "double", () => true));
-    report("チャージ連打", simulate(() => "charge", () => true));
-    report(
-      "通常＋瀕死(ZS<30)のみ回避",
-      simulate(() => "slash", (s) => s.pcZs < 30),
+    const slashEvade = simulate(() => "slash", () => true);
+    const slashNoEvade = simulate(() => "slash", () => false);
+    const doubleEvade = simulate(() => "double", () => true);
+    const chargeSpam = simulate(() => "charge", () => true);
+    const slashLowHpEvade = simulate(
+      () => "slash",
+      (s) => s.pcZs < 30,
     );
-    report(
-      "交互にチャージと通常",
-      simulate((s) => (s.round % 2 === 1 ? "charge" : "release"), () => true),
+    const alternate = simulate(
+      (s) => (s.round % 2 === 1 ? "charge" : "release"),
+      () => true,
     );
-    expect(true).toBe(true); // レポート用。アサーションは特に持たない
+
+    report("通常攻撃・回避あり", slashEvade);
+    report("通常攻撃・回避なし", slashNoEvade);
+    report("ダブルトリガー・回避あり", doubleEvade);
+    report("チャージ連打", chargeSpam);
+    report("通常＋瀕死(ZS<30)のみ回避", slashLowHpEvade);
+    report("交互にチャージと通常", alternate);
+
+    // 乱数シミュレーションなので絶対に落ちない広いレンジで、
+    // バランス退行（計算ロジックの破壊的変更）だけを検出する
+    const winRate = (r: SimResult) => r.wins / (r.wins + r.losses);
+    expect(winRate(slashEvade)).toBeGreaterThanOrEqual(0.55);
+    expect(winRate(slashEvade)).toBeLessThanOrEqual(0.95);
+    expect(winRate(slashNoEvade)).toBeGreaterThanOrEqual(0.2);
+    expect(winRate(slashNoEvade)).toBeLessThanOrEqual(0.75);
+    expect(winRate(chargeSpam)).toBeGreaterThanOrEqual(0.3);
+    expect(winRate(chargeSpam)).toBeLessThanOrEqual(0.85);
+    expect(slashEvade.avgRounds).toBeGreaterThanOrEqual(2);
+    expect(slashEvade.avgRounds).toBeLessThanOrEqual(8);
   });
 });

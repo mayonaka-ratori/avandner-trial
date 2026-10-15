@@ -112,8 +112,11 @@ export default async function handler(request: Request): Promise<Response> {
     return Response.json({ error: "closed" }, { status: 403, headers });
   }
 
+  // プロキシは右に追記するので、実クライアント IP は末尾に来る
+  // （先頭は呼び出し側が自由に偽装できる）
   const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    request.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ??
+    "unknown";
   if (!allowRequest(ip)) {
     return Response.json({ error: "rate limited" }, { status: 429, headers });
   }
