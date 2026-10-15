@@ -19,10 +19,13 @@ export const KUROAYA = {
   criticalTriggerBonus: 10,
 } as const;
 
-/** チャージアタックの威力倍率（【チャージアタック：×３】） */
+/** チャージアタックの威力倍率（【チャージアタック：×３】）
+ *
+ * 体験版では「1 ターン目に突入（無防備・回避不可）→ 2 ターン目に解放」の
+ * 2 ターン行動として実装する。原作の「長距離移動で威力向上」の再現で、
+ * コストは無防備になる時間そのもの。
+ */
 export const CHARGE_ATTACK_MULTIPLIER = 3;
-/** チャージアタックで使う超過移動のコスト（ZS から引く） */
-export const CHARGE_ATTACK_COST = 3;
 
 /** ダブルトリガーの目標値ペナルティ（−2） */
 export const DOUBLE_TRIGGER_PENALTY = 2;
@@ -42,7 +45,7 @@ export const PC = {
 /** 試遊用に縮小したザイラ */
 export const ZAIRA = {
   name: "ザイラ",
-  hp: 180,
+  hp: 140,
   flavor: "全高80メートル、全長300メートルに及ぶ直方体のエグゾーストフォートレス",
 } as const;
 
@@ -65,16 +68,16 @@ export const ZAIRA_ATTACKS: ZairaAttack[] = [
     label: "副砲",
     flavor: "装甲が開き、副砲が放たれる。",
     burst: 6,
-    target: 6,
-    power: 8,
+    target: 5,
+    power: 7,
     coordinateAttack: false,
   },
   {
     id: "machine-gun",
     label: "機銃掃射",
     flavor: "EF本体から機銃の掃射。面を制圧する弾幕はジグスラストでは避けられない。",
-    burst: 7,
-    target: 7,
+    burst: 6,
+    target: 6,
     power: 6,
     coordinateAttack: true,
   },
@@ -83,8 +86,8 @@ export const ZAIRA_ATTACKS: ZairaAttack[] = [
     label: "主砲",
     flavor: "装甲が大きく展開し、主砲が露出。強力な一撃が放たれる。",
     burst: 8,
-    target: 7,
-    power: 10,
+    target: 6,
+    power: 8,
     coordinateAttack: false,
   },
 ];

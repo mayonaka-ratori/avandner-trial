@@ -6,12 +6,12 @@
  *   1 ラウンド = プレイヤーの攻撃 1 回 → ザイラの反撃 1 回
  * 反撃の前に「ジグスラストで回避するか」を選ぶ。
  * 座標攻撃のラウンドは回避できない（原作どおりペナルティを受けない）。
+ * チャージアタックは 2 ターン行動（突入→解放）で、突入中は無防備。
  */
 
 import { judgeAttack, type AttackJudgement } from "./judge";
 import type { Rng } from "./dice";
 import {
-  CHARGE_ATTACK_COST,
   CHARGE_ATTACK_MULTIPLIER,
   DOUBLE_TRIGGER_PENALTY,
   JIG_THRUST_CELLS,
@@ -23,7 +23,7 @@ import {
   type ZairaAttack,
 } from "@/data/character";
 
-export type AttackMode = "slash" | "double" | "charge";
+export type AttackMode = "slash" | "double" | "charge" | "release";
 
 export interface AttackOption {
   mode: AttackMode;
@@ -31,7 +31,7 @@ export interface AttackOption {
   hint: string;
 }
 
-/** 毎ラウンドに出す攻撃の選択肢 */
+/** 通常ターンに出す攻撃の選択肢 */
 export const ATTACK_OPTIONS: AttackOption[] = [
   {
     mode: "slash",
@@ -45,10 +45,17 @@ export const ATTACK_OPTIONS: AttackOption[] = [
   },
   {
     mode: "charge",
-    label: `チャージアタック`,
-    hint: `超過移動で斬り込む（威力×${CHARGE_ATTACK_MULTIPLIER}・コスト${CHARGE_ATTACK_COST}）`,
+    label: "チャージアタック",
+    hint: `超過移動で突入し、次ターンに威力×${CHARGE_ATTACK_MULTIPLIER}で解放。突入中は回避できない`,
   },
 ];
+
+/** 突入中（charging）のターンに出す唯一の選択肢 */
+export const RELEASE_OPTION: AttackOption = {
+  mode: "release",
+  label: "黒絢を振り下ろす",
+  hint: `溜めた一撃を解放（威力×${CHARGE_ATTACK_MULTIPLIER}）`,
+};
 
 export type CombatPhase =
   | "player-turn" // 攻撃手段を選ぶ
@@ -68,6 +75,8 @@ export interface CombatState {
   round: number;
   zairaHp: number;
   pcZs: number;
+  /** チャージアタックの突入中か（次の手番は解放のみ・回避不可） */
+  charging: boolean;
   phase: CombatPhase;
   /** このラウンドに来る敵の攻撃 */
   incoming: ZairaAttack;
@@ -82,6 +91,7 @@ export function createCombat(): CombatState {
     round: 1,
     zairaHp: ZAIRA.hp,
     pcZs: PC.zsMax,
+    charging: false,
     phase: "player-turn",
     incoming: zairaAttackFor(1),
     log: [
@@ -97,6 +107,7 @@ export function createCombat(): CombatState {
 /**
  * プレイヤーの攻撃を解決する。ダブルトリガーは 2 回判定。
  * 命中後は敵の反撃へ（座標攻撃なら回避選択を飛ばす）。
+ * charge は突入のみで攻撃せず、その場で敵の反撃を回避なしで受ける。
  */
 export function playerAttack(
   state: CombatState,
@@ -105,9 +116,23 @@ export function playerAttack(
 ): CombatState {
   if (state.phase !== "player-turn") return state;
 
-  let zs = state.pcZs;
-  const results: AttackJudgement[] = [];
   const log = [...state.log];
+
+  // ── チャージアタック 1 ターン目：突入（無防備） ──
+  if (mode === "charge") {
+    log.push({
+      round: state.round,
+      actor: "pc",
+      text: "超過移動――間合いを一瞬で詰める。体勢を預けた、決めに行く一撃。",
+    });
+    const committed: CombatState = { ...state, charging: true, log };
+    // 突入中は回避できないので、そのまま敵の攻撃を無回避で解決する
+    return resolveEnemyAttack(committed, false, rng);
+  }
+
+  // ── 通常攻撃／ダブルトリガー／チャージ解放 ──
+  const results: AttackJudgement[] = [];
+  const isRelease = mode === "release";
 
   if (mode === "double") {
     for (const hand of ["右手", "左手"] as const) {
@@ -129,13 +154,11 @@ export function playerAttack(
       });
     }
   } else {
-    const isCharge = mode === "charge";
-    if (isCharge) zs -= CHARGE_ATTACK_COST;
     const judgement = judgeAttack({
       burst: KUROAYA.burst,
       target: KUROAYA.target,
       penalty: 0,
-      power: KUROAYA.power * (isCharge ? CHARGE_ATTACK_MULTIPLIER : 1),
+      power: KUROAYA.power * (isRelease ? CHARGE_ATTACK_MULTIPLIER : 1),
       damageReduction: 0,
       criticalTriggerBonus: KUROAYA.criticalTriggerBonus,
       rng,
@@ -144,8 +167,8 @@ export function playerAttack(
     log.push({
       round: state.round,
       actor: "pc",
-      text: isCharge
-        ? `超過移動――間合いを一瞬で詰め、黒絢を叩き込む。${describeJudgement(judgement)}`
+      text: isRelease
+        ? `突入の勢いそのままに、黒絢を振り下ろす。${describeJudgement(judgement)}`
         : `黒絢を振るう。${describeJudgement(judgement)}`,
       judgement,
     });
@@ -160,33 +183,29 @@ export function playerAttack(
       actor: "system",
       text: "ザイラの巨体が傾ぎ、ジアドスフィアの光が弾けて消えた。",
     });
-    return { ...state, zairaHp, pcZs: zs, phase: "won", lastPlayerResult: results, log };
-  }
-
-  if (zs <= 0) {
-    log.push({
-      round: state.round,
-      actor: "system",
-      text: "コストの支払い過ぎでジアドスフィアが尽きた。機関停止。",
-    });
-    return { ...state, zairaHp, pcZs: zs, phase: "lost", lastPlayerResult: results, log };
+    return {
+      ...state,
+      zairaHp,
+      charging: false,
+      phase: "won",
+      lastPlayerResult: results,
+      log,
+    };
   }
 
   const incoming = zairaAttackFor(state.round);
-  const nextPhase: CombatPhase = incoming.coordinateAttack ? "enemy-resolved" : "evade-prompt";
-
   const next: CombatState = {
     ...state,
     zairaHp,
-    pcZs: zs,
+    charging: false,
     incoming,
-    phase: nextPhase,
+    phase: incoming.coordinateAttack ? "enemy-resolved" : "evade-prompt",
     lastPlayerResult: results,
     log,
   };
 
   // 座標攻撃（回避不可）はそのまま敵の攻撃を解決する
-  if (nextPhase === "enemy-resolved") {
+  if (next.phase === "enemy-resolved") {
     return resolveEnemyAttack(next, false, rng);
   }
   return next;
@@ -202,7 +221,7 @@ export function resolveEnemyAttack(
   const log = [...state.log];
   let zs = state.pcZs;
 
-  const canEvade = !attack.coordinateAttack && evade;
+  const canEvade = !attack.coordinateAttack && evade && !state.charging;
   const penalty = canEvade ? JIG_THRUST_CELLS : 0;
   if (canEvade) {
     zs -= JIG_THRUST_COST;
@@ -221,6 +240,9 @@ export function resolveEnemyAttack(
     penalty,
     power: attack.power,
     damageReduction: PC.damageReduction,
+    // 体験版では敵の攻撃にクリティカルを付けない。
+    // クリ連鎖があると被弾が 50 点級まで振れて、初見が理不尽に沈むため
+    noCritical: true,
     rng,
   });
   const damage = judgement.appliedDamage ?? 0;
@@ -247,12 +269,12 @@ export function resolveEnemyAttack(
     };
   }
 
-  const nextRound = state.round + 1;
+  const nextRoundNum = state.round + 1;
   return {
     ...state,
-    round: nextRound,
+    round: nextRoundNum,
     pcZs: zs,
-    incoming: zairaAttackFor(nextRound),
+    incoming: zairaAttackFor(nextRoundNum),
     phase: "enemy-resolved",
     lastEnemyResult: judgement,
     log,
@@ -265,11 +287,14 @@ export function nextRound(state: CombatState): CombatState {
   return { ...state, phase: "player-turn" };
 }
 
+/** この手番に出すべき選択肢 */
+export function attackOptionsFor(state: CombatState): AttackOption[] {
+  return state.charging ? [RELEASE_OPTION] : ATTACK_OPTIONS;
+}
+
 function describeJudgement(j: AttackJudgement): string {
   if (j.autoFail) return "目標値が0以下――判定不能。弾は届かなかった。";
-  const parts = [
-    `${j.burst + j.extraDice}個のダイス：成功${j.successes}個`,
-  ];
+  const parts = [`${j.burst + j.extraDice}個のダイス：成功${j.successes}個`];
   if (j.criticals > 0) parts.push(`クリティカル${j.criticals}個`);
   if (j.appliedDamage !== null) parts.push(`${j.appliedDamage}ダメージ`);
   return parts.join("、") + "。";

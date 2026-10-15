@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FIRST_SCENE, SCENES, SCENE_MAP } from "./scenes";
+import { SCENE_PROMPTS } from "../../api/narrate";
 
 describe("シーン定義", () => {
   it("最初のシーンが存在する", () => {
@@ -46,6 +47,23 @@ describe("シーン定義", () => {
       const t = scene.interaction.type;
       if (t === "combat" || t === "ending") continue;
       expect(scene.next, scene.id).toBeTruthy();
+    }
+  });
+
+  it("narrationKey と free 入力の返答キーが API 側のプロンプトと対応している", () => {
+    for (const scene of SCENES) {
+      if (scene.narrationKey) {
+        expect(
+          SCENE_PROMPTS[scene.narrationKey],
+          `narrationKey: ${scene.narrationKey}`,
+        ).toBeTruthy();
+      }
+      if (scene.interaction.type === "free") {
+        expect(
+          SCENE_PROMPTS[`reply-${scene.id}`],
+          `reply key: reply-${scene.id}`,
+        ).toBeTruthy();
+      }
     }
   });
 

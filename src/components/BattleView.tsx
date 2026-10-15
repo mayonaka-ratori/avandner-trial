@@ -1,7 +1,7 @@
 import { useReducer, useState } from "react";
 import { Shield, Zap, RotateCcw, ChevronRight } from "lucide-react";
 import {
-  ATTACK_OPTIONS,
+  attackOptionsFor,
   createCombat,
   nextRound,
   playerAttack,
@@ -16,7 +16,7 @@ interface BattleViewProps {
 }
 
 type Action =
-  | { type: "attack"; mode: "slash" | "double" | "charge" }
+  | { type: "attack"; mode: "slash" | "double" | "charge" | "release" }
   | { type: "evade"; evade: boolean }
   | { type: "next" }
   | { type: "retry" };
@@ -60,8 +60,12 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* プレイヤーの手番 */}
       {state.phase === "player-turn" && (
         <div className="space-y-2">
-          <p className="text-sm text-hud-text-muted">――あなたの手番。どう攻める？</p>
-          {ATTACK_OPTIONS.map((opt) => (
+          <p className="text-sm text-hud-text-muted">
+            {state.charging
+              ? "――突入中。溜めた一撃を解放する。"
+              : "――あなたの手番。どう攻める？"}
+          </p>
+          {attackOptionsFor(state).map((opt) => (
             <button
               key={opt.mode}
               onClick={() => dispatch({ type: "attack", mode: opt.mode })}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attackOptionsFor,
   createCombat,
   nextRound,
   playerAttack,
@@ -49,9 +50,15 @@ describe("combat", () => {
   });
 
   it("敵の攻撃で ZS が尽きると lost になる", () => {
+    // プレイヤーは全弾外し、敵は全弾命中（出目1）する想定
     let s = playerAttack(createCombat(), "slash", ALL_MISS);
-    // 敵が全弾クリティカル級の命中（出目1は必ず成功）→ 大ダメージ
-    s = resolveEnemyAttack(s, false, ALL_CRIT);
+    let guard = 0;
+    while (s.phase !== "lost" && guard < 20) {
+      if (s.phase === "evade-prompt") s = resolveEnemyAttack(s, false, ALL_CRIT);
+      if (s.phase === "enemy-resolved") s = nextRound(s);
+      if (s.phase === "player-turn") s = playerAttack(s, "slash", ALL_MISS);
+      guard += 1;
+    }
     expect(s.pcZs).toBe(0);
     expect(s.phase).toBe("lost");
   });
@@ -61,9 +68,9 @@ describe("combat", () => {
     let s = playerAttack(createCombat(), "slash", ALL_CRIT);
     let guard = 0;
     while (s.phase !== "won" && guard < 20) {
-      s = resolveEnemyAttack(s, false, ALL_MISS);
-      s = nextRound(s);
-      s = playerAttack(s, "slash", ALL_CRIT);
+      if (s.phase === "evade-prompt") s = resolveEnemyAttack(s, false, ALL_MISS);
+      if (s.phase === "enemy-resolved") s = nextRound(s);
+      if (s.phase === "player-turn") s = playerAttack(s, "slash", ALL_CRIT);
       guard += 1;
     }
     expect(s.phase).toBe("won");
@@ -75,11 +82,29 @@ describe("combat", () => {
     expect(s.lastPlayerResult).toHaveLength(2);
   });
 
-  it("チャージアタックはコストを払い、威力が上がる", () => {
-    const s = playerAttack(createCombat(), "charge", ALL_HIT5);
-    expect(s.pcZs).toBe(PC.zsMax - 3);
-    // 威力30×3=90、成功2個で180→耐久180を削り切って勝つ
+  it("チャージアタックは突入（無防備）→解放の2ターン行動", () => {
+    // 1ターン目：突入。ダメージなし、回避なしで敵の攻撃を受けて enemy-resolved へ
+    let s = playerAttack(createCombat(), "charge", ALL_MISS);
+    expect(s.charging).toBe(true);
+    expect(s.zairaHp).toBe(ZAIRA.hp);
+    expect(s.phase).toBe("enemy-resolved");
+
+    // 2ターン目：選択肢は解放のみ
+    s = nextRound(s);
+    expect(attackOptionsFor(s)).toHaveLength(1);
+    expect(attackOptionsFor(s)[0].mode).toBe("release");
+
+    // 解放：威力30×3=90
+    s = playerAttack(s, "release", ALL_HIT5);
+    expect(s.charging).toBe(false);
     expect(s.lastPlayerResult?.[0].power).toBe(90);
+    expect(s.zairaHp).toBeLessThan(ZAIRA.hp);
+  });
+
+  it("突入中は回避コストを払わずフルで被弾する", () => {
+    const s = playerAttack(createCombat(), "charge", ALL_HIT5);
+    // 敵の副砲（目標値5）が出目5で全弾命中する→ ZS が大きく減っている
+    expect(s.pcZs).toBeLessThan(PC.zsMax - 10);
   });
 
   it("ラウンド2の敵攻撃は座標攻撃（機銃）で回避できない", () => {
