@@ -22,9 +22,38 @@ const ALLOWED_ORIGINS = [
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
-const MAX_OUTPUT_TOKENS = 400;
+const MAX_OUTPUT_TOKENS = 600;
 const MAX_FREE_INPUT = 200;
 const OPENAI_TIMEOUT_MS = 15_000;
+
+/*
+ * 簡易レート制限。インスタンス内メモリのベストエフォートで、
+ * edge の isolate をまたいでは共有されない。curl 等の連打から
+ * OpenAI 課金を守る抑止であって、本番の防衛線は OpenAI 側の
+ * 利用上限設定（DEPLOY.md 参照）。
+ * 1 回の体験でこの API は 8〜10 回呼ばれる想定。
+ */
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX_PER_IP = 30;
+const RATE_MAX_TOTAL = 300;
+const rateState = {
+  resetAt: 0,
+  total: 0,
+  perIp: new Map<string, number>(),
+};
+
+function allowRequest(ip: string): boolean {
+  const now = Date.now();
+  if (now >= rateState.resetAt) {
+    rateState.resetAt = now + RATE_WINDOW_MS;
+    rateState.total = 0;
+    rateState.perIp.clear();
+  }
+  rateState.total += 1;
+  const count = (rateState.perIp.get(ip) ?? 0) + 1;
+  rateState.perIp.set(ip, count);
+  return count <= RATE_MAX_PER_IP && rateState.total <= RATE_MAX_TOTAL;
+}
 
 const COMMON_PROMPT = `あなたはTRPG『黒絢のアヴァンドナー』（ハイマニューバ傭兵少女TRPG）の体験版シナリオの語り部です。
 
@@ -81,6 +110,12 @@ export default async function handler(request: Request): Promise<Response> {
   }
   if (process.env.TRIAL_ENABLED === "false") {
     return Response.json({ error: "closed" }, { status: 403, headers });
+  }
+
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!allowRequest(ip)) {
+    return Response.json({ error: "rate limited" }, { status: 429, headers });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;

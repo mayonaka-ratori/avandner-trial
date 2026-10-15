@@ -23,8 +23,13 @@ export type Interaction =
 
 export interface SceneDef {
   id: string;
-  /** 画面の小さな見出し（フェイズ名など） */
+  /** 画面上部のシステムラベル（"// MISSION ALERT" など） */
   kicker?: string;
+  /**
+   * 本文の前に出す警告帯のラベル（"INCOMING TRANSMISSION" など）。
+   * 銅色の枠で点滅表示される。
+   */
+  alert?: string;
   title: string;
   /**
    * LLM に語りを生成させるときの場面キー（api/narrate.ts の PROMPTS と対応）。

@@ -16,7 +16,7 @@ export const FIRST_SCENE = "awakening";
 export const SCENES: SceneDef[] = [
   {
     id: "awakening",
-    kicker: "オープニング",
+    kicker: "// AWAKENING",
     title: "覚醒",
     narrationKey: "awakening",
     fallback: [
@@ -40,7 +40,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "city",
-    kicker: "オープニング",
+    kicker: "// ORIENTATION",
     title: "街の案内",
     narrationKey: "city",
     fallback: [
@@ -54,7 +54,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "pub",
-    kicker: "オープニング",
+    kicker: "// DOWNTIME",
     title: "パブ「スターダスト」",
     narrationKey: "pub",
     fallback: [
@@ -70,13 +70,15 @@ export const SCENES: SceneDef[] = [
           label: "「お兄ちゃんに会うのが楽しみなんだね」",
           response: [
             "「いえ！　お魚が楽しみなんです！　お兄ちゃんに会うのは二の次です！」",
+            "そう言いながらも、ステラは小声で付け足す。「……明日の朝イチで、駅まで迎えに行くんです。楽しみで、昨日も眠れなくて」",
             "「いけない、またサボってるって怒られちゃう！」――ステラは照れた様子で、店の奥へ戻っていった。",
           ],
         },
         {
           label: "「装甲列車か。無事に帰るといいな」",
           response: [
-            "「ですよねー！　えへへぇ」",
+            "「ですよねー！　イーフェとの交易路、最近物騒らしいですから」",
+            "「あの列車、お兄ちゃんの“家”みたいなものなんです。無事に帰ってこないと、お魚もお土産話も届かないので」",
             "「いけない、またサボってるって怒られちゃう！」――ステラは照れた様子で、店の奥へ戻っていった。",
           ],
         },
@@ -86,7 +88,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "gabriella",
-    kicker: "オープニング",
+    kicker: "// RUMOR",
     title: "不吉な噂",
     narrationKey: "gabriella",
     fallback: [
@@ -110,6 +112,7 @@ export const SCENES: SceneDef[] = [
           response: [
             "出所不明の女の話だ。真に受けるほうがどうかしている。",
             "……だが。エグゾーストフォートレス、企業、装甲列車。言葉の断片が、培養脳の奥でかすかに引っかかっている。",
+            "振り返ると、ガブリエッラはもういない。残ったのは「くふふ」という笑い声の余韻だけだった。",
           ],
         },
       ],
@@ -118,7 +121,8 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "briefing",
-    kicker: "ミドルフェイズ",
+    kicker: "// MISSION ALERT",
+    alert: "INCOMING TRANSMISSION",
     title: "ミッション",
     narrationKey: "briefing",
     fallback: [
@@ -149,7 +153,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "prebattle",
-    kicker: "クライマックス",
+    kicker: "// PRE-ENGAGEMENT",
     title: "出撃前",
     narrationKey: "prebattle",
     fallback: [
@@ -168,7 +172,8 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "insertion",
-    kicker: "クライマックス",
+    kicker: "// INSERTION",
+    alert: "HOSTILE DETECTED",
     title: "超高速突入",
     narrationKey: "insertion",
     fallback: [
@@ -182,7 +187,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: "ending",
-    kicker: "エンディング",
+    kicker: "// EPILOGUE",
     title: "帰還",
     narrationKey: "ending",
     fallback: [
@@ -195,6 +200,28 @@ export const SCENES: SceneDef[] = [
     interaction: { type: "ending" },
   },
 ];
+
+/**
+ * エンディング本文の末尾に差し込む、選択履歴に応じた追記文。
+ * プレイヤーが歩んだ道を一文だけ振り返る。
+ */
+export function endingExtras(
+  choiceLog: string[],
+  battleResult: "won" | "lost-then-won",
+): string[] {
+  const extras: string[] = [];
+  if (choiceLog.some((c) => c.includes("流そう"))) {
+    extras.push(
+      "あのとき流した噂は、本当だった。だが、間に合った。それで十分だ。",
+    );
+  }
+  if (battleResult === "lost-then-won") {
+    extras.push(
+      "一度は機関を止められた。それでも立ち上がって、戻ってきた。――それが、この少女の初陣だった。",
+    );
+  }
+  return extras;
+}
 
 export const SCENE_MAP: ReadonlyMap<string, SceneDef> = new Map(
   SCENES.map((s) => [s.id, s]),

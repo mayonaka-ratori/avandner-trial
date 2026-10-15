@@ -9,6 +9,10 @@ TRPG『黒絢のアヴァンドナー』（著: 瀧里フユ ／ 発行: どら�
 ## 仕組み
 
 - **画面**: Vite + React 18 + TypeScript + Tailwind 4。GitHub Pages に公開
+- **演出**: 「プレイヤーの視界＝アヴァンドナーの OS」という作り。
+  起動シーケンス・タイプライター表示・システム警告帯・モニター質感
+  （格子・走査線・周辺減光）は NieR:Automata の UI 作法を参考にしている。
+  演出はすべて CSS と素の React で、追加ライブラリなし・音声なし
 - **語り**: OpenAI API（既定 gpt-4o-mini）が場面の描写と自由入力への返答を生成。
   シナリオの進行と戦闘の判定はすべてアプリ側で行い、LLM は語り専用
 - **中継**: `api/` の Vercel Functions が OpenAI を呼ぶ。キーはサーバーの環境変数にのみ置く
@@ -27,6 +31,13 @@ npm run lint
 npm run build      # dist/ に出力
 npm run qr         # qr.png を生成
 ```
+
+## 保守メモ
+
+- `src/engine/judge.ts` と `src/engine/dice.ts` は `C:\tools\avandnar-app`
+  （本編ルール参照アプリ）からのコピーです。本家側に修正が入ったら
+  こちらにも同じ修正を当ててください。逆にこちらで直したものを本家へ
+  戻す必要が出たときも同様です
 
 ## 公開手順（当日までにやること）
 

@@ -4,13 +4,17 @@ import { FIRST_SCENE, getScene } from "@/scenes/scenes";
 import { TitleScreen } from "@/components/TitleScreen";
 import { SceneView } from "@/components/SceneView";
 import { BattleView } from "@/components/BattleView";
+import { BootSequence } from "@/components/BootSequence";
+import { SystemChrome } from "@/components/SystemChrome";
 
-type Phase = "checking" | "title" | "playing" | "closed";
+type Phase = "checking" | "title" | "boot" | "playing" | "closed";
 
 interface PlayState {
   sceneId: string;
   choiceLog: string[];
   battleResult: "won" | "lost-then-won";
+  /** 体験開始時刻（エンディングの経過時間表示用） */
+  startedAt: number;
 }
 
 const SAVE_KEY = "avandnar-trial-save";
@@ -28,6 +32,7 @@ function loadSave(): PlayState | null {
         ? data.choiceLog.filter((c): c is string => typeof c === "string")
         : [],
       battleResult: data.battleResult === "lost-then-won" ? "lost-then-won" : "won",
+      startedAt: typeof data.startedAt === "number" ? data.startedAt : Date.now(),
     };
   } catch {
     return null;
@@ -41,6 +46,7 @@ export default function App() {
     sceneId: FIRST_SCENE,
     choiceLog: [],
     battleResult: "won",
+    startedAt: Date.now(),
   });
   const [saved, setSaved] = useState<PlayState | null>(null);
 
@@ -65,10 +71,15 @@ export default function App() {
   }, []);
 
   const start = useCallback(() => {
-    const fresh = { sceneId: FIRST_SCENE, choiceLog: [], battleResult: "won" as const };
+    const fresh = {
+      sceneId: FIRST_SCENE,
+      choiceLog: [],
+      battleResult: "won" as const,
+      startedAt: Date.now(),
+    };
     setPlay(fresh);
     persist(fresh);
-    setPhase("playing");
+    setPhase("boot");
   }, [persist]);
 
   const resume = useCallback(() => {
@@ -95,45 +106,65 @@ export default function App() {
 
   if (phase === "checking") {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-hud-text-muted">
-        <span className="text-sm">読み込んでいます…</span>
-      </div>
+      <>
+        <SystemChrome />
+        <div className="flex min-h-dvh items-center justify-center text-hud-text-muted">
+          <span className="font-mono-hud text-xs tracking-[0.2em]">
+            INITIALIZING…
+          </span>
+        </div>
+      </>
     );
   }
 
   if (phase === "closed") {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-2xl text-hud-heading">黒絢のアヴァンドナー</h1>
-        <p className="mt-1 text-sm tracking-[0.2em] text-hud-gold">― 体験版 ―</p>
-        <p className="mt-8 text-sm leading-relaxed text-hud-text-muted">
-          この体験版はイベント会場限定です。
-          <br />
-          会期中でしたら、通信環境をご確認のうえもう一度お試しください。
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-8 rounded-md border border-hud-border bg-hud-panel px-6 py-2.5 text-sm text-hud-text hover:border-hud-gold/60"
-        >
-          再読み込み
-        </button>
-      </div>
+      <>
+        <SystemChrome status="LINK CLOSED" />
+        <div className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+          <h1 className="text-2xl text-hud-heading">黒絢のアヴァンドナー</h1>
+          <p className="mt-1 text-sm tracking-[0.2em] text-hud-gold">― 体験版 ―</p>
+          <p className="mt-8 text-sm leading-relaxed text-hud-text-muted">
+            この体験版はイベント会場限定です。
+            <br />
+            会期中でしたら、通信環境をご確認のうえもう一度お試しください。
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-8 rounded-md border border-hud-border bg-hud-panel px-6 py-2.5 text-sm text-hud-text hover:border-hud-gold/60"
+          >
+            再読み込み
+          </button>
+        </div>
+      </>
     );
   }
 
   if (phase === "title") {
     return (
-      <TitleScreen
-        onStart={start}
-        onResume={resume}
-        // エンディングは「もう一度遊ぶ」しかないので再開対象から外す
-        canResume={
-          saved !== null &&
-          saved.sceneId !== FIRST_SCENE &&
-          saved.sceneId !== "ending"
-        }
-        offline={offline}
-      />
+      <>
+        <SystemChrome />
+        <TitleScreen
+          onStart={start}
+          onResume={resume}
+          // エンディングは「もう一度遊ぶ」しかないので再開対象から外す
+          canResume={
+            saved !== null &&
+            saved.sceneId !== FIRST_SCENE &&
+            saved.sceneId !== "ending"
+          }
+          offline={offline}
+        />
+      </>
+    );
+  }
+
+  if (phase === "boot") {
+    return (
+      <>
+        <SystemChrome status="BOOT" />
+        <BootSequence onDone={() => setPhase("playing")} />
+      </>
     );
   }
 
@@ -141,41 +172,48 @@ export default function App() {
 
   return (
     <main className="min-h-dvh">
-      <SceneView
-        key={scene.id}
-        scene={scene}
-        offline={offline}
-        choiceLog={play.choiceLog}
-        battleResult={play.battleResult}
-        onAdvance={(record) => {
-          if (scene.interaction.type === "ending") {
-            // 「もう一度遊ぶ」
-            try {
-              sessionStorage.removeItem(SAVE_KEY);
-            } catch {
-              // 消せなくてもよい
-            }
-            setSaved(null);
-            setPhase("title");
-            return;
-          }
-          if (scene.next) advance(scene.next, record);
-        }}
-      />
-      {scene.interaction.type === "combat" && (
-        <div className="mx-auto w-full max-w-xl px-5 pb-8 safe-area-bottom">
-          <BattleView
-            onEnd={(result) => {
-              setPlay((prev) => {
-                const next = { ...prev, battleResult: result };
-                persist(next);
-                return next;
-              });
-              advance("ending");
-            }}
-          />
-        </div>
+      <SystemChrome status={scene.kicker ?? undefined} />
+      {/* 覚醒シーンだけ白フラッシュから入る（培養槽を開けた瞬間の光） */}
+      {scene.id === "awakening" && (
+        <div className="pointer-events-none fixed inset-0 z-50 wake-flash" aria-hidden="true" />
       )}
+      <div key={scene.id} className="scene-in">
+        <SceneView
+          scene={scene}
+          offline={offline}
+          choiceLog={play.choiceLog}
+          battleResult={play.battleResult}
+          startedAt={play.startedAt}
+          onAdvance={(record) => {
+            if (scene.interaction.type === "ending") {
+              // 「もう一度遊ぶ」
+              try {
+                sessionStorage.removeItem(SAVE_KEY);
+              } catch {
+                // 消せなくてもよい
+              }
+              setSaved(null);
+              setPhase("title");
+              return;
+            }
+            if (scene.next) advance(scene.next, record);
+          }}
+        />
+        {scene.interaction.type === "combat" && (
+          <div className="mx-auto w-full max-w-xl px-5 pb-8 safe-area-bottom">
+            <BattleView
+              onEnd={(result) => {
+                setPlay((prev) => {
+                  const next = { ...prev, battleResult: result };
+                  persist(next);
+                  return next;
+                });
+                advance("ending");
+              }}
+            />
+          </div>
+        )}
+      </div>
     </main>
   );
 }

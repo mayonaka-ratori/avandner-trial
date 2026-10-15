@@ -10,22 +10,37 @@ interface TitleScreenProps {
 export function TitleScreen({ onStart, onResume, canResume, offline }: TitleScreenProps) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-      <p className="text-xs tracking-[0.3em] text-hud-gold-dim">
+      <p className="font-mono-hud text-[10px] tracking-[0.35em] text-hud-gold-dim">
+        HIGH-MANEUVER MERCENARY GIRLS TRPG
+      </p>
+      <p className="beat-in mt-4 text-xs tracking-[0.3em] text-hud-gold-dim">
         ハイマニューバ傭兵少女TRPG
       </p>
-      <h1 className="mt-3 text-3xl font-medium text-hud-heading">
+      <h1
+        className="beat-in mt-3 text-3xl font-medium text-hud-heading"
+        style={{ animationDelay: "0.25s" }}
+      >
         黒絢のアヴァンドナー
       </h1>
-      <p className="mt-1 text-sm tracking-[0.2em] text-hud-gold">
+      <p
+        className="beat-in mt-1 text-sm tracking-[0.2em] text-hud-gold"
+        style={{ animationDelay: "0.5s" }}
+      >
         ― 体験版「装甲列車救援依頼」―
       </p>
-      <p className="mt-8 max-w-sm text-sm leading-relaxed text-hud-text-muted">
+      <p
+        className="beat-in mt-8 max-w-sm text-sm leading-relaxed text-hud-text-muted"
+        style={{ animationDelay: "0.75s" }}
+      >
         あなたは、今日この世界に生まれたばかりの新人アヴァンドナー。
         5〜10分で一つの物語を駆け抜けます。
       </p>
       {offline && (
-        <p className="mt-4 max-w-sm text-xs leading-relaxed text-hud-copper">
-          通信環境が不安定なため、簡易モードで進行します（内容は同じです）。
+        <p
+          className="beat-in mt-4 max-w-sm text-xs leading-relaxed text-hud-copper"
+          style={{ animationDelay: "0.9s" }}
+        >
+          外部通信リンク未確立 ― オフライン記録で進行します（内容は同じです）。
         </p>
       )}
       <div className="mt-10 flex flex-col items-center gap-3">

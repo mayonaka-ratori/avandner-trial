@@ -34,8 +34,21 @@ Pages が使えないことがある。その場合は public にするか、Fre
    - `OPENAI_API_KEY` = OpenAI の API キー
    - `TRIAL_ENABLED` = `true`
    - （任意）`OPENAI_MODEL` = `gpt-4o-mini`（変更したいときだけ）
+   - 注意: `OPENAI_MODEL` を gpt-5 系など新しい系統に変えると、
+     `max_tokens` パラメータを受け付けず API が全滅することがある
+     （あちらは `max_completion_tokens` を使う）。変えたら必ず
+     動作確認をすること。失敗してもアプリは予備文章で動き続ける
 5. Deploy → `https://avandnar-trial.vercel.app/api/status` を開き、
    `{"enabled":true}` が返れば OK
+
+**知っておくこと:**
+
+- `https://avandnar-trial.vercel.app/` を直接開いてもゲーム画面が動く
+  （Vercel がフロントもビルドするため）。CORS はこの直アクセスを
+  防げないが、キルスイッチ `TRIAL_ENABLED` は共通で効くので実害はない
+- `/api/narrate` には簡易レート制限（IP あたり 30 回/分）を入れてあるが、
+  edge の仕組み上「同一インスタンス内」でしか効かない。必ず下の
+  「費用の目安」にある OpenAI 側の利用上限も設定しておくこと
 
 画面側の API 呼び先は既定で `https://avandnar-trial.vercel.app`。
 別名にした場合は build 時に環境変数 `VITE_API_BASE` を設定する
@@ -65,5 +78,7 @@ npm run qr
 ## 費用の目安
 
 - OpenAI gpt-4o-mini: 1 回の体験あたり約 4,000 出力トークン。
-  100 人が遊んでも数円〜十数円程度。心配なら OpenAI 側で月額上限を設定する
+  100 人が遊んでも数円〜十数円程度
+- **推奨**: OpenAI のダッシュボード（Settings → Billing → Limits）で
+  月額上限を設定しておく。API を外部から叩かれても課金が青天井にならない
 - Vercel Hobby・GitHub Pages: 無料枠で足りる想定

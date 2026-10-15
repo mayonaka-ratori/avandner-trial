@@ -1,4 +1,4 @@
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { Shield, Zap, RotateCcw, ChevronRight } from "lucide-react";
 import {
   attackOptionsFor,
@@ -38,20 +38,74 @@ function reducer(state: CombatState, action: Action): CombatState {
 export function BattleView({ onEnd }: BattleViewProps) {
   const [state, dispatch] = useReducer(reducer, undefined, createCombat);
   const [lostCount, setLostCount] = useState(0);
+  const [shaking, setShaking] = useState(false);
+  const prevZs = useRef(state.pcZs);
+
+  // 被弾したら画面を軽く揺らす
+  useEffect(() => {
+    if (state.pcZs < prevZs.current) setShaking(true);
+    prevZs.current = state.pcZs;
+  }, [state.pcZs]);
 
   const hpPct = Math.max(0, Math.round((state.zairaHp / ZAIRA.hp) * 100));
   const zsPct = Math.max(0, Math.round((state.pcZs / PC.zsMax) * 100));
 
+  const playerDamage =
+    state.lastPlayerResult?.reduce((s, j) => s + (j.appliedDamage ?? 0), 0) ?? 0;
+  const enemyDamage = state.lastEnemyResult?.appliedDamage ?? 0;
+
   return (
-    <div className="mt-6 space-y-5 border-t border-hud-border pt-6">
+    <div
+      className={`mt-6 space-y-5 border-t border-hud-border pt-6 ${shaking ? "hud-shake" : ""}`}
+      onAnimationEnd={(e) => {
+        if (e.animationName === "hudShake") setShaking(false);
+      }}
+    >
       {/* 敵味方のゲージ */}
-      <div className="space-y-2">
-        <Gauge label={`${ZAIRA.name}（敵）`} value={state.zairaHp} max={ZAIRA.hp} pct={hpPct} color="copper" />
-        <Gauge label={`あなたのジアドスフィア`} value={state.pcZs} max={PC.zsMax} pct={zsPct} color="gold" />
+      <div className="relative space-y-2">
+        <Gauge
+          label={`${ZAIRA.name}（敵）`}
+          value={state.zairaHp}
+          max={ZAIRA.hp}
+          pct={hpPct}
+          color="copper"
+        />
+        <div className="relative">
+          <Gauge
+            label="あなたのジアドスフィア"
+            value={state.pcZs}
+            max={PC.zsMax}
+            pct={zsPct}
+            color="gold"
+            flash={shaking}
+          />
+          {state.charging && (
+            <span className="absolute -top-1 right-0 rounded border border-hud-copper/60 bg-hud-copper/10 px-1.5 py-0.5 font-mono-hud text-[9px] tracking-[0.2em] text-hud-copper">
+              EXPOSED
+            </span>
+          )}
+        </div>
+        {/* ダメージ数字のポップ */}
+        {playerDamage > 0 && state.phase !== "player-turn" && (
+          <span
+            key={`pdmg-${state.round}-${state.log.length}`}
+            className="damage-pop absolute -top-3 right-0 font-mono-hud text-lg font-bold text-hud-gold-bright"
+          >
+            -{playerDamage}
+          </span>
+        )}
+        {enemyDamage > 0 && (
+          <span
+            key={`edmg-${state.round}-${state.log.length}`}
+            className="damage-pop absolute bottom-6 right-0 font-mono-hud text-lg font-bold text-hud-copper"
+          >
+            -{enemyDamage}
+          </span>
+        )}
       </div>
 
-      <p className="text-center text-xs tracking-[0.2em] text-hud-text-muted">
-        ラウンド {state.round}
+      <p className="text-center font-mono-hud text-xs tracking-[0.2em] text-hud-text-muted">
+        ROUND {state.round}
       </p>
 
       {/* ログ（末尾だけ見せる） */}
@@ -78,20 +132,31 @@ export function BattleView({ onEnd }: BattleViewProps) {
         </div>
       )}
 
-      {/* 回避選択 */}
+      {/* 回避選択（敵の攻撃予告つき） */}
       {state.phase === "evade-prompt" && (
         <div className="space-y-2">
+          <p className="alert-pulse rounded border border-hud-copper/60 bg-hud-copper/10 px-3 py-2 font-mono-hud text-[10px] tracking-[0.25em] text-hud-copper">
+            WARNING // {state.incoming.label}
+            <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-hud-text-muted">
+              {state.incoming.flavor}
+            </span>
+          </p>
           <p className="text-sm text-hud-text-muted">
             敵の攻撃が来る。ジグスラストで回避する？（コスト：ZS −{JIG_THRUST_COST}）
           </p>
           <button
             onClick={() => dispatch({ type: "evade", evade: true })}
-            className="flex w-full items-center gap-2 rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3 text-left transition-colors hover:bg-hud-gold/20"
+            disabled={state.pcZs <= JIG_THRUST_COST}
+            className="flex w-full items-center gap-2 rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3 text-left transition-colors hover:bg-hud-gold/20 disabled:opacity-40"
           >
             <Zap size={16} className="shrink-0 text-hud-gold-bright" />
             <span>
               <span className="block text-sm font-medium text-hud-gold-bright">ジグスラストで回避する</span>
-              <span className="text-xs text-hud-text-muted">敵の目標値 −{JIG_THRUST_CELLS}。避けられる可能性が上がる</span>
+              <span className="text-xs text-hud-text-muted">
+                {state.pcZs <= JIG_THRUST_COST
+                  ? `残りZSがコスト以下のため使えない（払うと機関停止する）`
+                  : `敵の目標値 −${JIG_THRUST_CELLS}。避けられる可能性が上がる`}
+              </span>
             </span>
           </button>
           <button
@@ -121,7 +186,10 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* 勝利 */}
       {state.phase === "won" && (
         <div className="space-y-3">
-          <p className="text-center text-lg text-hud-gold-bright">―― ザイラ、撃破 ――</p>
+          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-gold-bright">
+            TARGET NEUTRALIZED
+          </p>
+          <p className="text-center text-sm text-hud-text-muted">―― ザイラ、撃破 ――</p>
           <button
             onClick={() => onEnd(lostCount > 0 ? "lost-then-won" : "won")}
             className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3 text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
@@ -135,6 +203,9 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* 敗北（リトライ可） */}
       {state.phase === "lost" && (
         <div className="space-y-3">
+          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-copper">
+            SYSTEM FAILURE
+          </p>
           <p className="text-center text-sm leading-relaxed text-hud-copper">
             機関停止。――だが、姉貴分があなたの機体を引きずって退避させる。
             <br />
@@ -166,12 +237,14 @@ function Gauge({
   max,
   pct,
   color,
+  flash,
 }: {
   label: string;
   value: number;
   max: number;
   pct: number;
   color: "gold" | "copper";
+  flash?: boolean;
 }) {
   const barColor = color === "gold" ? "bg-hud-gold" : "bg-hud-copper";
   return (
@@ -184,7 +257,7 @@ function Gauge({
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-hud-panel">
         <div
-          className={`h-full rounded-full ${barColor} transition-all duration-500`}
+          className={`h-full rounded-full ${barColor} transition-all duration-500 ${flash ? "gauge-flash" : ""}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -197,6 +270,9 @@ function BattleLog({ state }: { state: CombatState }) {
   const shown = state.log.filter((e) => e.round >= state.round - 1).slice(-8);
   return (
     <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-hud-border bg-hud-panel/60 p-3">
+      <p className="font-mono-hud text-[9px] tracking-[0.3em] text-hud-gold-dim">
+        COMBAT LOG
+      </p>
       {shown.map((entry, i) => (
         <div key={i} className="beat-in">
           <p
@@ -223,13 +299,14 @@ function DiceRow({ judgement }: { judgement: AttackJudgement }) {
       {judgement.dice.map((d: JudgeDie, i: number) => (
         <span
           key={i}
-          className={`flex h-6 w-6 items-center justify-center rounded border text-[11px] ${
+          className={`die-in flex h-6 w-6 items-center justify-center rounded border font-mono-hud text-[11px] ${
             d.isCritical
-              ? "border-hud-gold-bright bg-hud-gold/30 font-bold text-hud-gold-bright"
+              ? "die-crit border-hud-gold-bright bg-hud-gold/30 font-bold text-hud-gold-bright"
               : d.isSuccess
                 ? "border-hud-gold/50 bg-hud-gold/10 text-hud-gold-bright"
                 : "border-hud-border text-hud-text-muted"
           }`}
+          style={{ animationDelay: `${i * 90}ms` }}
           title={d.wave > 0 ? `振り足し${d.wave}回目` : undefined}
         >
           {d.value}

@@ -56,6 +56,9 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
   // ── タイトル ──────────────────────────────
   await tap(await screen.findByRole("button", { name: /物語をはじめる/ }));
 
+  // ── 起動シーケンス（タップでスキップ） ────
+  await tap(await screen.findByRole("button", { name: /起動シーケンス/ }));
+
   // ── 覚醒（自由入力） ──────────────────────
   await screen.findByText(/目覚めたあなたの、第一声は/);
   await user.type(screen.getByRole("textbox"), pattern.firstWords);
@@ -100,8 +103,10 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
     }
     const evade = screen.queryByRole("button", { name: /ジグスラストで回避する/ });
     if (evade) {
+      // 残りZSがコスト以下だと回避ボタンは無効化されるので受ける側を押す
+      const usable = pattern.evade && !(evade as HTMLButtonElement).disabled;
       await tap(
-        pattern.evade
+        usable
           ? evade
           : screen.getByRole("button", { name: /そのまま受ける/ }),
       );
