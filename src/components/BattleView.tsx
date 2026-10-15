@@ -140,6 +140,10 @@ export function BattleView({ onEnd }: BattleViewProps) {
             <br />
             まだ、やり直せる。
           </p>
+          <p className="text-center text-xs leading-relaxed text-hud-text-muted">
+            ヒント：敵の攻撃に「ジグスラストで回避する」を使うと、被弾がぐっと減ります。
+            大きく削りたいときは「チャージアタック」。
+          </p>
           <button
             onClick={() => {
               setLostCount((c) => c + 1);

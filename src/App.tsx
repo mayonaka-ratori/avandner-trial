@@ -22,7 +22,13 @@ function loadSave(): PlayState | null {
     const data = JSON.parse(raw) as PlayState;
     if (typeof data.sceneId !== "string") return null;
     getScene(data.sceneId); // 存在しないシーンなら捨てる
-    return { sceneId: data.sceneId, choiceLog: data.choiceLog ?? [], battleResult: "won" };
+    return {
+      sceneId: data.sceneId,
+      choiceLog: Array.isArray(data.choiceLog)
+        ? data.choiceLog.filter((c): c is string => typeof c === "string")
+        : [],
+      battleResult: data.battleResult === "lost-then-won" ? "lost-then-won" : "won",
+    };
   } catch {
     return null;
   }
@@ -120,7 +126,12 @@ export default function App() {
       <TitleScreen
         onStart={start}
         onResume={resume}
-        canResume={saved !== null && saved.sceneId !== FIRST_SCENE}
+        // エンディングは「もう一度遊ぶ」しかないので再開対象から外す
+        canResume={
+          saved !== null &&
+          saved.sceneId !== FIRST_SCENE &&
+          saved.sceneId !== "ending"
+        }
         offline={offline}
       />
     );
@@ -133,6 +144,7 @@ export default function App() {
       <SceneView
         key={scene.id}
         scene={scene}
+        offline={offline}
         choiceLog={play.choiceLog}
         battleResult={play.battleResult}
         onAdvance={(record) => {
