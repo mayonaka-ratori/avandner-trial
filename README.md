@@ -1,0 +1,39 @@
+# 黒絢のアヴァンドナー 体験版（avandnar-trial）
+
+TRPG『黒絢のアヴァンドナー』（著: 瀧里フユ ／ 発行: どらこにあん）の、
+イベント会場向けソロ体験アプリです。QRコードからスマホで開き、
+本編シナリオ「装甲列車救援依頼」を短縮した物語を 5〜10 分で遊べます。
+
+> **人に配らないでください。** シナリオ本文とデータは 瀧里フユ／どらこにあん の著作物です。
+
+## 仕組み
+
+- **画面**: Vite + React 18 + TypeScript + Tailwind 4。GitHub Pages に公開
+- **語り**: OpenAI API（既定 gpt-4o-mini）が場面の描写と自由入力への返答を生成。
+  シナリオの進行と戦闘の判定はすべてアプリ側で行い、LLM は語り専用
+- **中継**: `api/` の Vercel Functions が OpenAI を呼ぶ。キーはサーバーの環境変数にのみ置く
+- **フォールバック**: 全場面に書き下ろしの予備文章があり、API・電波・Vercel の
+  どれが死んでも最後まで遊べる
+- **当日限定**: `TRIAL_ENABLED=false` で「体験終了」画面に切り替わる（キルスイッチ）
+
+## コマンド
+
+```bash
+npm install
+npm run dev        # http://localhost:5176/avandnar-trial/
+npm test -- --run  # テスト
+npm run typecheck  # tsc --noEmit
+npm run lint
+npm run build      # dist/ に出力
+npm run qr         # qr.png を生成
+```
+
+## 公開手順（当日までにやること）
+
+詳しくは [docs/DEPLOY.md](docs/DEPLOY.md) を読んでください。概要は:
+
+1. GitHub リポジトリ `mayonaka-ratori/avandnar-trial` に push
+2. リポジトリ Settings → Pages → Source を「GitHub Actions」に
+3. Vercel にリポジトリを接続し、環境変数 `OPENAI_API_KEY`（と `TRIAL_ENABLED=true`）を設定
+4. `npm run qr` で QR を生成して印刷
+5. 終了後は Vercel の環境変数を `TRIAL_ENABLED=false` に

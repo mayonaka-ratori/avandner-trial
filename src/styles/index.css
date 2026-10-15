@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/*
+ * 体験版の配色 — avandnar-app の黒×金のテーマを、このアプリ用に最小限で抜き出したもの。
+ * 背景は暖かみのある黒、見出しとアクセントは金、サブアクセントは銅。
+ */
+@theme {
+  --color-hud-bg: #0b0a06;
+  --color-hud-panel: #15130c;
+  --color-hud-text: #e2ddd0;
+  --color-hud-text-muted: #7a715c;
+  --color-hud-heading: #fdf6e3;
+  --color-hud-gold: #d4af37;
+  --color-hud-gold-bright: #e8c556;
+  --color-hud-gold-dim: #826416;
+  --color-hud-copper: #e0846b;
+  --color-hud-copper-dim: #9d4d30;
+  --color-hud-border: rgba(122, 98, 32, 0.45);
+  --color-hud-danger: #d4183d;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  @apply bg-hud-bg text-hud-text;
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+    "Yu Gothic", sans-serif;
+}
+
+/* 段落を順番にふわっと出す */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.beat-in {
+  animation: fadeSlideIn 0.45s ease-out both;
+}
+
+/* iPhone のホームインジケータ帯を避ける */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
