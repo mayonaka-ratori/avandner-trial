@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
-const BASE = '/avandnar-trial/'
+const BASE = '/avandner-trial/'
 
 export default defineConfig({
   base: BASE,

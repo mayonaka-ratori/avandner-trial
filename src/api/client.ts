@@ -9,7 +9,7 @@
 /** 中継 API のベース URL。ビルド時に差し替え可能 */
 const API_BASE: string =
   (import.meta.env.VITE_API_BASE as string | undefined) ??
-  "https://avandnar-trial.vercel.app";
+  "https://avandner-trial.vercel.app";
 
 const TIMEOUT_MS = 15_000;
 

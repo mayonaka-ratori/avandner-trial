@@ -1,6 +1,6 @@
 /**
  * judge.ts — 命中判定とダメージの数え方（『黒絢のアヴァンドナー』のルール）
- * （avandnar-app の game/lib/attackJudge.ts と同じもの。import 先だけ dice.ts に替えてある）
+ * （avandner-app の game/lib/attackJudge.ts と同じもの。import 先だけ dice.ts に替えてある）
  *
  *   - ダイスは１０面体。０の出目は１０として扱う
  *   - 「連射数」に等しい数のダイスを振り、「目標値」以下の目を出したダイスの個数が成功数

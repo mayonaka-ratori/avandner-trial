@@ -9,7 +9,7 @@ import QRCode from "qrcode";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const url = process.argv[2] ?? "https://mayonaka-ratori.github.io/avandnar-trial/";
+const url = process.argv[2] ?? "https://mayonaka-ratori.github.io/avandner-trial/";
 const out = join(dirname(fileURLToPath(import.meta.url)), "..", "qr.png");
 
 await QRCode.toFile(out, url, {

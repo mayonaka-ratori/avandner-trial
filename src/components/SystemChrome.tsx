@@ -20,7 +20,7 @@ export function SystemChrome({ status }: { status?: string }) {
       {/* 上部ステータス行 */}
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 pt-1.5">
         <span className="font-mono-hud text-[9px] tracking-[0.25em] text-hud-gold-dim/80">
-          AVANDNAR // GEODESIC SPHERE
+          AVANDNER // GEODESIC SPHERE
         </span>
         {status && (
           <span className="font-mono-hud text-[9px] tracking-[0.25em] text-hud-gold-dim/80">

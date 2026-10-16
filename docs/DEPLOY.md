@@ -1,15 +1,17 @@
-# 公開手順 — avandnar-trial
+# 公開手順 — avandner-trial
 
 体験版をイベント当日に使える状態にする手順。作業はこの順で行う。
+
+2026年10月16日に、GitHubの名前と公開先を `avandner-trial` へ変更した。新しいURLは `https://mayonaka-ratori.github.io/avandner-trial/`。旧URL `https://mayonaka-ratori.github.io/avandnar-trial/` は移転案内を表示し、5秒後に新しいURLへ移動する。旧名のリポジトリには案内用のファイルだけを置く。
 
 ## 1. GitHub に push する
 
 ```bash
-cd C:\tools\avandnar-trial
+cd C:\tools\avandner-trial
 git init
 git add -A
 git commit -m "initial: 体験版アプリ"
-gh repo create avandnar-trial --private --source=. --push
+gh repo create avandner-trial --private --source=. --push
 ```
 
 リポジトリは private でよい（GitHub Pages は private リポジトリでも
@@ -22,12 +24,12 @@ Pages が使えないことがある。その場合は public にするか、Fre
 1. リポジトリの **Settings → Pages**
 2. **Source** を「GitHub Actions」にする
 3. main へ push すると `.github/workflows/deploy.yml` が動き、
-   `https://mayonaka-ratori.github.io/avandnar-trial/` に出る
+   `https://mayonaka-ratori.github.io/avandner-trial/` に出る
 
 ## 3. Vercel に API を置く
 
 1. Vercel にログイン → **Add New → Project**
-2. `avandnar-trial` リポジトリを Import
+2. `avandner-trial` リポジトリを Import
 3. Build の設定:
    - Framework Preset: **Vite**（そのままでよい。Vercel 側でもビルドされるが害はない）
 4. **Environment Variables** に 2 つ設定:
@@ -38,25 +40,25 @@ Pages が使えないことがある。その場合は public にするか、Fre
      `max_tokens` パラメータを受け付けず API が全滅することがある
      （あちらは `max_completion_tokens` を使う）。変えたら必ず
      動作確認をすること。失敗してもアプリは予備文章で動き続ける
-5. Deploy → `https://avandnar-trial.vercel.app/api/status` を開き、
+5. Deploy → `https://avandner-trial.vercel.app/api/status` を開き、
    `{"enabled":true}` が返れば OK
 
 **知っておくこと:**
 
-- `https://avandnar-trial.vercel.app/` を直接開いてもゲーム画面が動く
+- `https://avandner-trial.vercel.app/` を直接開いてもゲーム画面が動く
   （Vercel がフロントもビルドするため）。CORS はこの直アクセスを
   防げないが、キルスイッチ `TRIAL_ENABLED` は共通で効くので実害はない
 - `/api/narrate` には簡易レート制限（IP あたり 30 回/分）を入れてあるが、
   edge の仕組み上「同一インスタンス内」でしか効かない。必ず下の
   「費用の目安」にある OpenAI 側の利用上限も設定しておくこと
 
-画面側の API 呼び先は既定で `https://avandnar-trial.vercel.app`。
+画面側の API 呼び先は既定で `https://avandner-trial.vercel.app`。
 別名にした場合は build 時に環境変数 `VITE_API_BASE` を設定する
 （GitHub Actions の build ステップに `env:` で渡す）。
 
 ## 4. 動作確認
 
-- `https://mayonaka-ratori.github.io/avandnar-trial/` をスマホで開く
+- `https://mayonaka-ratori.github.io/avandner-trial/` をスマホで開く
 - 最初から最後まで通す（選択・自由入力・戦闘・リトライ・エンディング）
 - 機内モードにしてリロード → 「簡易モード」のまま予備文章で最後まで遊べることを確認
 - 予備文章で全文が読めるか、開発者モードで API を止めて確認する

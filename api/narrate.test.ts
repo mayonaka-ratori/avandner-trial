@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "./narrate";
 
-const URL = "https://avandnar-trial.vercel.app/api/narrate";
+const URL = "https://avandner-trial.vercel.app/api/narrate";
 const GOOD_ORIGIN = "https://mayonaka-ratori.github.io";
 
 function req(body: unknown, headers: Record<string, string> = {}): Request {

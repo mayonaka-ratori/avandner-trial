@@ -1,6 +1,6 @@
 /**
  * dice.ts — ダイスを振るだけの純関数
- * （avandnar-app の core/dice/roll.ts と同じもの）
+ * （avandner-app の core/dice/roll.ts と同じもの）
  */
 
 /** 0 以上 1 未満の数を返す関数。既定は Math.random */

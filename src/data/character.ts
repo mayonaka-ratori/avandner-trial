@@ -2,7 +2,7 @@
  * character.ts — 体験版で使う固定データ
  *
  * PC は本編サンプルキャラクター「軽量逆関節・白兵型」（本編 p.15）。
- * 数値は avandnar-app の src/game/data/sampleCharacters.ts（原典の写しから
+ * 数値は avandner-app の src/game/data/sampleCharacters.ts（原典の写しから
  * 生成されたデータ）から、体験版で使う分だけを転記した。
  *
  * 敵のエグゾーストフォートレス「ザイラ」は本編シナリオ「装甲列車救援依頼」
