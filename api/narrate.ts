@@ -156,6 +156,8 @@ export default async function handler(request: Request): Promise<Response> {
   }
   const userMessage = userParts.length > 0 ? userParts.join("\n") : "この場面の語りを書いてください。";
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
   try {
     const res = await fetch(OPENAI_URL, {
       method: "POST",
@@ -173,7 +175,7 @@ export default async function handler(request: Request): Promise<Response> {
         max_tokens: MAX_OUTPUT_TOKENS,
         temperature: 0.8,
       }),
-      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+      signal: controller.signal,
     });
     if (!res.ok) {
       // キーや入力文を記録せず、管理画面で失敗の種類を確認できるようにする。
@@ -200,6 +202,8 @@ export default async function handler(request: Request): Promise<Response> {
       name: error instanceof Error ? error.name : "unknown",
     });
     return Response.json({ error: "upstream" }, { status: 502, headers });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
