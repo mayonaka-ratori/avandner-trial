@@ -88,6 +88,7 @@ describe("api/narrate", () => {
   });
 
   it("上流が成功すれば text を返し、自由入力がプロンプトに渡る", async () => {
+    vi.stubEnv("OPENAI_API_KEY", " test-key\n");
     const res = await handler(
       req({ scene: "reply-awakening", freeInput: "おはよう" }),
     );
@@ -99,6 +100,8 @@ describe("api/narrate", () => {
     );
     expect(body.model).toBe("gpt-4o-mini");
     expect(body.messages[2].content).toContain("おはよう");
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers.authorization)
+      .toBe("Bearer test-key");
   });
 
   it("上流が 5xx なら 502", async () => {

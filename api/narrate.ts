@@ -121,7 +121,7 @@ export default async function handler(request: Request): Promise<Response> {
     return Response.json({ error: "rate limited" }, { status: 429, headers });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     return Response.json({ error: "not configured" }, { status: 503, headers });
   }
@@ -195,7 +195,10 @@ export default async function handler(request: Request): Promise<Response> {
       return Response.json({ error: "empty" }, { status: 502, headers });
     }
     return Response.json({ text }, { headers });
-  } catch {
+  } catch (error) {
+    console.error("OpenAI connection failed", {
+      name: error instanceof Error ? error.name : "unknown",
+    });
     return Response.json({ error: "upstream" }, { status: 502, headers });
   }
 }
