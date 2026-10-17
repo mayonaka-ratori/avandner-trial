@@ -62,7 +62,7 @@ describe("combat", () => {
     let s = playerAttack(createCombat(), "slash", ALL_MISS);
     let guard = 0;
     while (s.phase !== "lost" && guard < 20) {
-      if (s.phase === "evade-prompt") s = resolveEnemyAttack(s, false, ALL_CRIT);
+      if (s.phase === "evade-prompt" || s.phase === "enemy-ready") s = resolveEnemyAttack(s, false, ALL_CRIT);
       if (s.phase === "enemy-resolved") s = nextRound(s);
       if (s.phase === "player-turn") s = playerAttack(s, "slash", ALL_MISS);
       guard += 1;
@@ -76,7 +76,7 @@ describe("combat", () => {
     let s = playerAttack(createCombat(), "slash", ALL_CRIT);
     let guard = 0;
     while (s.phase !== "won" && guard < 20) {
-      if (s.phase === "evade-prompt") s = resolveEnemyAttack(s, false, ALL_MISS);
+      if (s.phase === "evade-prompt" || s.phase === "enemy-ready") s = resolveEnemyAttack(s, false, ALL_MISS);
       if (s.phase === "enemy-resolved") s = nextRound(s);
       if (s.phase === "player-turn") s = playerAttack(s, "slash", ALL_CRIT);
       guard += 1;
@@ -91,11 +91,13 @@ describe("combat", () => {
   });
 
   it("チャージアタックは突入（無防備）→解放の2ターン行動", () => {
-    // 1ターン目：突入。ダメージなし、回避なしで敵の攻撃を受けて enemy-resolved へ
+    // 1ターン目：突入。敵のダイスは別の操作で振る。
     let s = playerAttack(createCombat(), "charge", ALL_MISS);
     expect(s.charging).toBe(true);
     expect(s.zairaHp).toBe(ZAIRA.hp);
-    expect(s.phase).toBe("enemy-resolved");
+    expect(s.phase).toBe("enemy-ready");
+    expect(s.pcZs).toBe(PC.zsMax);
+    s = resolveEnemyAttack(s, false, ALL_MISS);
 
     // 2ターン目：選択肢は解放のみ
     s = nextRound(s);
@@ -110,7 +112,8 @@ describe("combat", () => {
   });
 
   it("突入中は回避コストを払わずフルで被弾する", () => {
-    const s = playerAttack(createCombat(), "charge", ALL_HIT5);
+    let s = playerAttack(createCombat(), "charge", ALL_HIT5);
+    s = resolveEnemyAttack(s, false, ALL_HIT5);
     // 敵の副砲（目標値5）が出目5で全弾命中する→ ZS が大きく減っている
     expect(s.pcZs).toBeLessThan(PC.zsMax - 10);
   });
@@ -120,7 +123,36 @@ describe("combat", () => {
     s = resolveEnemyAttack(s, false, ALL_MISS);
     s = nextRound(s);
     s = playerAttack(s, "slash", ALL_MISS);
-    // 座標攻撃は evade-prompt を飛ばして即解決される
+    // 座標攻撃にも独立したダイス操作がある。
+    expect(s.phase).toBe("enemy-ready");
+    expect(s.lastEnemyResult).toBeUndefined();
+    s = resolveEnemyAttack(s, false, ALL_MISS);
     expect(s.phase).toBe("enemy-resolved");
+    expect(s.round).toBe(2);
+  });
+
+  it("接近と回避の位置を記録し、次の攻撃で中央へ戻る", () => {
+    let s = createCombat();
+    expect(s.pcCell).toEqual({ ring: "out", hour: 6 });
+    s = playerAttack(s, "slash", ALL_MISS);
+    expect(s.pcCell).toEqual({ ring: "center" });
+    s = resolveEnemyAttack(s, true, ALL_MISS);
+    expect(s.pcCell).toEqual({ ring: "out", hour: 7 });
+    expect(s.lastMove?.path).toHaveLength(4);
+    s = nextRound(s);
+    s = playerAttack(s, "slash", ALL_MISS);
+    expect(s.pcCell).toEqual({ ring: "center" });
+    expect(s.approachHour).toBe(7);
+  });
+
+  it("結果を読む間はラウンドを進めず、次へ進んだときに更新する", () => {
+    let s = playerAttack(createCombat(), "slash", ALL_MISS);
+    s = resolveEnemyAttack(s, false, ALL_MISS);
+    expect(s.round).toBe(1);
+    s = nextRound(s);
+    expect(s.round).toBe(2);
+    expect(s.incoming.id).toBe("machine-gun");
+    expect(s.lastPlayerResult).toBeUndefined();
+    expect(s.lastEnemyResult).toBeUndefined();
   });
 });

@@ -11,6 +11,7 @@
 
 import { judgeAttack, type AttackJudgement } from "./judge";
 import type { Rng } from "./dice";
+import { approachPath, cellLabel, CENTER, evadePath, START_CELL, type ClockCell, type ClockHour, type Movement } from "./position";
 import {
   CHARGE_ATTACK_MULTIPLIER,
   DOUBLE_TRIGGER_PENALTY,
@@ -60,6 +61,7 @@ export const RELEASE_OPTION: AttackOption = {
 export type CombatPhase =
   | "player-turn" // 攻撃手段を選ぶ
   | "evade-prompt" // 敵の攻撃に対して回避するか選ぶ
+  | "enemy-ready" // 回避できない攻撃。敵のダイスを振るのを待つ
   | "enemy-resolved" // 敵の攻撃の結果を見せる（「次へ」で次ラウンド）
   | "won"
   | "lost";
@@ -68,6 +70,7 @@ export interface CombatLogEntry {
   round: number;
   actor: "pc" | "zaira" | "system";
   text: string;
+  title?: string;
   judgement?: AttackJudgement;
 }
 
@@ -75,6 +78,9 @@ export interface CombatState {
   round: number;
   zairaHp: number;
   pcZs: number;
+  pcCell: ClockCell;
+  approachHour: ClockHour;
+  lastMove?: Movement;
   /** チャージアタックの突入中か（次の手番は解放のみ・回避不可） */
   charging: boolean;
   phase: CombatPhase;
@@ -91,6 +97,8 @@ export function createCombat(): CombatState {
     round: 1,
     zairaHp: ZAIRA.hp,
     pcZs: PC.zsMax,
+    pcCell: START_CELL,
+    approachHour: 6,
     charging: false,
     phase: "player-turn",
     incoming: zairaAttackFor(1),
@@ -98,7 +106,7 @@ export function createCombat(): CombatState {
       {
         round: 1,
         actor: "system",
-        text: `――ローザ渓谷。${ZAIRA.flavor}。装甲列車が到達する前に、撃破しなければならない。`,
+        text: "中央のザイラを倒し、列車を守る。",
       },
     ],
   };
@@ -107,7 +115,7 @@ export function createCombat(): CombatState {
 /**
  * プレイヤーの攻撃を解決する。ダブルトリガーは 2 回判定。
  * 命中後は敵の反撃へ（座標攻撃なら回避選択を飛ばす）。
- * charge は突入のみで攻撃せず、その場で敵の反撃を回避なしで受ける。
+ * charge は突入のみで攻撃しない。敵の攻撃は別のダイス操作で解決する。
  */
 export function playerAttack(
   state: CombatState,
@@ -115,20 +123,31 @@ export function playerAttack(
   rng?: Rng,
 ): CombatState {
   if (state.phase !== "player-turn") return state;
+  if (!attackOptionsFor(state).some((option) => option.mode === mode)) return state;
 
   const log = [...state.log];
+  const path = approachPath(state.pcCell);
+  if (path.length > 1) {
+    log.push({ round: state.round, actor: "pc", text: `ザイラへ接近。${path.map(cellLabel).join(" → ")}。` });
+  }
+  const approachHour = state.pcCell.ring === "center" ? state.approachHour : state.pcCell.hour;
+  state = {
+    ...state,
+    pcCell: CENTER,
+    approachHour,
+    lastMove: path.length > 1 ? { kind: "approach", path } : undefined,
+    lastPlayerResult: undefined,
+    lastEnemyResult: undefined,
+  };
 
   // ── チャージアタック 1 ターン目：突入（無防備） ──
   if (mode === "charge") {
     log.push({
       round: state.round,
       actor: "pc",
-      text: "超過移動――間合いを一瞬で詰める。体勢を預けた、決めに行く一撃。",
+      text: "チャージアタックで突入。今回は攻撃せず、次の手番に威力3倍で攻撃します。突入中は回避できません。",
     });
-    const committed: CombatState = { ...state, charging: true, log };
-    // 突入中は回避できないので、そのまま敵の攻撃を無回避で解決する
-    // （phase は player-turn のままなので内部関数を直接呼ぶ）
-    return resolveIncoming(committed, false, rng);
+    return { ...state, charging: true, phase: "enemy-ready", log };
   }
 
   // ── 通常攻撃／ダブルトリガー／チャージ解放 ──
@@ -151,6 +170,7 @@ export function playerAttack(
         round: state.round,
         actor: "pc",
         text: `${hand}の黒絢。${describeJudgement(judgement)}`,
+        title: `${hand}の黒絢`,
         judgement,
       });
     }
@@ -171,6 +191,7 @@ export function playerAttack(
       text: isRelease
         ? `突入の勢いそのままに、黒絢を振り下ろす。${describeJudgement(judgement)}`
         : `黒絢を振るう。${describeJudgement(judgement)}`,
+      title: isRelease ? "チャージアタックの一撃" : "黒絢で斬る",
       judgement,
     });
   }
@@ -200,30 +221,24 @@ export function playerAttack(
     zairaHp,
     charging: false,
     incoming,
-    phase: incoming.coordinateAttack ? "enemy-resolved" : "evade-prompt",
+    phase: incoming.coordinateAttack ? "enemy-ready" : "evade-prompt",
     lastPlayerResult: results,
     log,
   };
 
-  // 座標攻撃（回避不可）はそのまま敵の攻撃を解決する
-  // （phase は既に enemy-resolved なので内部関数を直接呼ぶ）
-  if (next.phase === "enemy-resolved") {
-    return resolveIncoming(next, false, rng);
-  }
   return next;
 }
 
 /**
  * 敵の攻撃を解決する。evade = ジグスラストで回避を試みる。
- * evade-prompt フェイズ以外から呼ばれても何もしない（UI の二重呼び出し防止）。
- * 内部からの解決は resolveIncoming を使う。
+ * 敵の攻撃を待っているフェイズ以外では何もしない（二重呼び出し防止）。
  */
 export function resolveEnemyAttack(
   state: CombatState,
   evade: boolean,
   rng?: Rng,
 ): CombatState {
-  if (state.phase !== "evade-prompt") return state;
+  if (state.phase !== "evade-prompt" && state.phase !== "enemy-ready") return state;
   return resolveIncoming(state, evade, rng);
 }
 
@@ -237,14 +252,17 @@ function resolveIncoming(
   const log = [...state.log];
   let zs = state.pcZs;
 
-  const canEvade = !attack.coordinateAttack && evade && !state.charging;
+  const canEvade = !attack.coordinateAttack && evade && !state.charging && state.pcZs > JIG_THRUST_COST;
   const penalty = canEvade ? JIG_THRUST_CELLS : 0;
+  const path = canEvade ? evadePath(state.approachHour) : undefined;
+  const pcCell = path ? path[path.length - 1] : state.pcCell;
+  const lastMove: Movement | undefined = path ? { kind: "evade", path } : state.lastMove;
   if (canEvade) {
     zs -= JIG_THRUST_COST;
     log.push({
       round: state.round,
       actor: "pc",
-      text: `ジグスラスト噴射――3セル分、身体を引き剥がす（ZS−${JIG_THRUST_COST}）。`,
+      text: `ジグスラストで3セル移動。${path!.map(cellLabel).join(" → ")}。ジアドスフィアを${JIG_THRUST_COST}消費。`,
     });
   }
 
@@ -267,6 +285,7 @@ function resolveIncoming(
     round: state.round,
     actor: "zaira",
     text: describeJudgement(judgement),
+    title: `ザイラの${attack.label}`,
     judgement,
   });
 
@@ -279,18 +298,19 @@ function resolveIncoming(
     return {
       ...state,
       pcZs: 0,
+      pcCell,
+      lastMove,
       phase: "lost",
       lastEnemyResult: judgement,
       log,
     };
   }
 
-  const nextRoundNum = state.round + 1;
   return {
     ...state,
-    round: nextRoundNum,
     pcZs: zs,
-    incoming: zairaAttackFor(nextRoundNum),
+    pcCell,
+    lastMove,
     phase: "enemy-resolved",
     lastEnemyResult: judgement,
     log,
@@ -300,7 +320,8 @@ function resolveIncoming(
 /** 「次のラウンドへ」ボタン */
 export function nextRound(state: CombatState): CombatState {
   if (state.phase !== "enemy-resolved") return state;
-  return { ...state, phase: "player-turn" };
+  const round = state.round + 1;
+  return { ...state, round, incoming: zairaAttackFor(round), lastPlayerResult: undefined, lastEnemyResult: undefined, phase: "player-turn" };
 }
 
 /** この手番に出すべき選択肢 */

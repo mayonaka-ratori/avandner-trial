@@ -1,356 +1,222 @@
-import { useEffect, useReducer, useRef, useState } from "react";
-import { Shield, Zap, RotateCcw, ChevronRight } from "lucide-react";
-import {
-  attackOptionsFor,
-  createCombat,
-  nextRound,
-  playerAttack,
-  resolveEnemyAttack,
-  type CombatState,
-} from "@/engine/combat";
-import { JIG_THRUST_CELLS, JIG_THRUST_COST, PC, ZAIRA } from "@/data/character";
-import type { AttackJudgement, JudgeDie } from "@/engine/judge";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, RotateCcw } from "lucide-react";
+import { attackOptionsFor, createCombat, nextRound, playerAttack, resolveEnemyAttack, type AttackMode, type CombatLogEntry, type CombatState } from "@/engine/combat";
+import { CHARGE_ATTACK_MULTIPLIER, DOUBLE_TRIGGER_PENALTY, JIG_THRUST_CELLS, JIG_THRUST_COST, KUROAYA, PC, ZAIRA } from "@/data/character";
+import { cellLabel } from "@/engine/position";
+import { BattleMap } from "./BattleMap";
+import { BattleDice, TenSidedDie } from "./BattleDice";
 
-interface BattleViewProps {
-  onEnd: (result: "won" | "lost-then-won") => void;
+type Pending = { type: "attack"; mode: AttackMode } | { type: "enemy"; evade: boolean };
+const ROLL_MS = import.meta.env.MODE === "test" ? 0 : 700;
+
+export function BattleView({ onEnd }: { onEnd: (result: "won" | "lost-then-won") => void }) {
+  const [state, setState] = useState(createCombat);
+  const [lostCount, setLostCount] = useState(0);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [rolling, setRolling] = useState(false);
+  const [eventStart, setEventStart] = useState(0);
+  const rollLock = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const resultRef = useRef<HTMLElement>(null);
+  const controlsRef = useRef<HTMLElement>(null);
+  const rollButtonRef = useRef<HTMLButtonElement>(null);
+  const previousLogLength = useRef(state.log.length);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    if (state.log.length > previousLogLength.current) {
+      resultRef.current?.focus({ preventScroll: true });
+      resultRef.current?.scrollIntoView({ block: "start" });
+    }
+    previousLogLength.current = state.log.length;
+  }, [state.log.length]);
+
+  useEffect(() => {
+    if (pending) {
+      controlsRef.current?.scrollIntoView({ block: "nearest" });
+      rollButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [pending]);
+
+  function apply(action: Pending) {
+    // 乱数を使う計算は更新関数の外で一度だけ行う。StrictModeで振り直さない。
+    const next = action.type === "attack" ? playerAttack(state, action.mode) : resolveEnemyAttack(state, action.evade);
+    setEventStart(state.log.length);
+    setState(next);
+    setPending(null);
+  }
+
+  function roll(action: Pending) {
+    if (rollLock.current) return;
+    rollLock.current = true;
+    setRolling(true);
+    timer.current = setTimeout(() => {
+      apply(action);
+      setRolling(false);
+      rollLock.current = false;
+    }, ROLL_MS);
+  }
+
+  const step = phaseLabel(state);
+  const active: Pending | null = pending ?? (state.phase === "enemy-ready" ? { type: "enemy", evade: false } : null);
+  const latest = state.log.slice(eventStart);
+  const rollInfo = active ? describeRoll(state, active) : null;
+
+  return (
+    <section className="battle-screen" aria-label="ザイラとの戦闘">
+      <h2 className="battle-title">ザイラとの戦闘</h2>
+      <div className="battle-overview">
+        <BattleMap state={state} />
+        <div className="battle-readout">
+          <p className="battle-round">第{state.round}ラウンド<span className="battle-phase">{shortPhase(state)}</span></p>
+          <Gauge label="ザイラの耐久値" value={state.zairaHp} max={ZAIRA.hp} enemy />
+          <Gauge label="あなたのジアドスフィア" value={state.pcZs} max={PC.zsMax} />
+          <p className="battle-position">あなた：<strong>{cellLabel(state.pcCell)}</strong><br />ザイラ：中央</p>
+          <p className="battle-map-note">移動先は自動で選びます</p>
+        </div>
+      </div>
+
+      <p className="battle-step" role="status" aria-live="polite">{rolling ? "10面ダイスを振っています…" : step}</p>
+
+      <section ref={resultRef} tabIndex={-1} className="battle-latest" aria-label="直前の結果">
+        <h3>{state.log.length === 1 ? "戦闘の目的" : "直前の結果"}</h3>
+        {latest.map((entry, i) => <ResultEntry key={`${eventStart}-${i}`} entry={entry} />)}
+      </section>
+
+      <section ref={controlsRef} className="battle-controls" aria-label="次の行動">
+        {!active && state.phase === "player-turn" && <>
+          <h3>{state.charging ? "溜めた一撃を放ちます" : "攻撃を選んでください"}</h3>
+          <p className="battle-hint">{state.pcCell.ring !== "center" && "中央まで接近して攻撃します。"}敵の次の攻撃：<strong>{state.incoming.label}</strong>{state.incoming.coordinateAttack && "（回避できません）"}</p>
+          <div className="battle-action-list">
+            {attackOptionsFor(state).map((option) => (
+              <button key={option.mode} onClick={() => setPending({ type: "attack", mode: option.mode })} className="battle-action">
+                <span className="battle-action-name">{option.label}</span>
+                <span>{attackHint(option.mode)}</span>
+              </button>
+            ))}
+          </div>
+        </>}
+
+        {!active && state.phase === "evade-prompt" && <>
+          <h3>ザイラが{state.incoming.label}で反撃します</h3>
+          <p className="battle-hint">回避するか選んでから、敵のダイスを振ります。</p>
+          <div className="battle-action-list">
+            <button className="battle-action" disabled={state.pcZs <= JIG_THRUST_COST} onClick={() => setPending({ type: "enemy", evade: true })}>
+              <span className="battle-action-name">ジグスラストで回避する</span>
+              <span>{state.pcZs <= JIG_THRUST_COST ? "ジアドスフィアが足りません" : `3セル移動して当たりにくくする。ジアドスフィアを${JIG_THRUST_COST}消費`}</span>
+            </button>
+            <button className="battle-action" onClick={() => setPending({ type: "enemy", evade: false })}>
+              <span className="battle-action-name">そのまま受ける</span>
+              <span>回避のための消費なし。命中した分のダメージを受けます</span>
+            </button>
+          </div>
+        </>}
+
+        {active && rollInfo && <div className="battle-roll-panel" aria-busy={rolling}>
+          <h3>{rollInfo.title}</h3>
+          <p>{rollInfo.description}</p>
+          {active.type === "enemy" && state.phase === "enemy-ready" && <p className="battle-hint">{state.charging ? "突入中のため回避できません。" : "広い範囲への攻撃のため回避できません。"}</p>}
+          {active.type === "attack" && active.mode === "charge" ? (
+            <button ref={rollButtonRef} className="battle-primary" onClick={() => apply(active)}>突入する<ChevronRight size={16} /></button>
+          ) : <>
+            <div className="battle-rolling-dice" aria-hidden="true">
+              {Array.from({ length: Math.min(rollInfo.count, 8) }, (_, i) => <TenSidedDie key={i} rolling={rolling} />)}
+            </div>
+            <button ref={rollButtonRef} className="battle-primary" disabled={rolling} onClick={() => roll(active)}>
+              {rolling ? "ダイスを振っています…" : "ダイスを振る"}
+            </button>
+          </>}
+          {pending && <button className="battle-reselect" disabled={rolling} onClick={() => setPending(null)}>選び直す</button>}
+        </div>}
+
+        {state.phase === "enemy-resolved" && <button className="battle-primary" onClick={() => setState(nextRound(state))}>次のラウンドへ<ChevronRight size={16} /></button>}
+        {state.phase === "won" && <>
+          <h3>ザイラを撃破しました</h3>
+          <p>装甲列車を守りました。</p>
+          <button className="battle-primary" onClick={() => onEnd(lostCount > 0 ? "lost-then-won" : "won")}>エンディングへ<ChevronRight size={16} /></button>
+        </>}
+        {state.phase === "lost" && <>
+          <h3>機関停止。姉貴分があなたを救出しました</h3>
+          <p>もう一度挑戦できます。回避できる攻撃にはジグスラストを試してみてください。</p>
+          <button className="battle-primary" onClick={() => {
+            setLostCount((count) => count + 1);
+            setState(createCombat());
+            setEventStart(0);
+            setPending(null);
+            window.scrollTo({ top: 0 });
+          }}><RotateCcw size={16} />もう一度挑戦する</button>
+        </>}
+      </section>
+
+      <details className="battle-history">
+        <summary>これまでの戦闘記録（{state.log.length}件）</summary>
+        <ol>{state.log.map((entry, i) => <li key={i}><span>第{entry.round}ラウンド・{actorLabel(entry.actor)}</span><p>{entry.text}</p>{entry.judgement && <BattleDice judgement={entry.judgement} />}</li>)}</ol>
+      </details>
+    </section>
+  );
 }
 
-type Action =
-  | { type: "attack"; mode: "slash" | "double" | "charge" | "release" }
-  | { type: "evade"; evade: boolean }
-  | { type: "next" }
-  | { type: "retry" };
+function actorLabel(actor: CombatLogEntry["actor"]) {
+  return actor === "pc" ? "あなた" : actor === "zaira" ? "ザイラ" : "戦況";
+}
 
-function reducer(state: CombatState, action: Action): CombatState {
-  switch (action.type) {
-    case "attack":
-      return playerAttack(state, action.mode);
-    case "evade":
-      return resolveEnemyAttack(state, action.evade);
-    case "next":
-      return nextRound(state);
-    case "retry":
-      return createCombat();
+function ResultEntry({ entry }: { entry: CombatLogEntry }) {
+  const judgement = entry.judgement;
+  return (
+    <div className={`battle-result-entry battle-result-${entry.actor}`}>
+      {judgement ? <>
+        <h4>{entry.title ?? actorLabel(entry.actor)}</h4>
+        <p className="battle-damage">{judgement.successes === 0 ? "攻撃は外れました" : `${entry.actor === "pc" ? "ザイラ" : "あなた"}に${judgement.appliedDamage ?? 0}ダメージ`}</p>
+        <BattleDice judgement={judgement} />
+      </> : <p>{entry.text}</p>}
+    </div>
+  );
+}
+
+function Gauge({ label, value, max, enemy = false }: { label: string; value: number; max: number; enemy?: boolean }) {
+  return <div className={`battle-gauge ${enemy ? "battle-gauge-enemy" : ""}`}>
+    <div><span>{enemy ? label : "あなたのZS"}</span><strong>{value}<small> / {max}</small></strong></div>
+    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} className="battle-gauge-track"><div style={{ width: `${value / max * 100}%` }} /></div>
+  </div>;
+}
+
+function phaseLabel(state: CombatState) {
+  switch (state.phase) {
+    case "player-turn": return "あなたの攻撃 → 敵の反撃 → 次のラウンド";
+    case "evade-prompt": return "あなたの攻撃は終了。次は敵の反撃です";
+    case "enemy-ready": return "次は敵の攻撃のダイスを振ります";
+    case "enemy-resolved": return `第${state.round}ラウンドの攻防が終わりました`;
+    case "won": return "戦闘終了。ザイラを撃破しました";
+    case "lost": return "戦闘終了。あなたの機体が停止しました";
   }
 }
 
-/** 戦闘画面。攻撃→（回避選択）→敵攻撃、をラウンド単位で回す */
-export function BattleView({ onEnd }: BattleViewProps) {
-  const [state, dispatch] = useReducer(reducer, undefined, createCombat);
-  const [lostCount, setLostCount] = useState(0);
-  const [shaking, setShaking] = useState(false);
-  const prevZs = useRef(state.pcZs);
-
-  // 被弾したら画面を軽く揺らす
-  useEffect(() => {
-    if (state.pcZs < prevZs.current) setShaking(true);
-    prevZs.current = state.pcZs;
-  }, [state.pcZs]);
-
-  const hpPct = Math.max(0, Math.round((state.zairaHp / ZAIRA.hp) * 100));
-  const zsPct = Math.max(0, Math.round((state.pcZs / PC.zsMax) * 100));
-
-  const playerDamage =
-    state.lastPlayerResult?.reduce((s, j) => s + (j.appliedDamage ?? 0), 0) ?? 0;
-  const enemyDamage = state.lastEnemyResult?.appliedDamage ?? 0;
-
-  return (
-    <div
-      className={`mt-6 space-y-5 border-t border-hud-border pt-6 ${shaking ? "hud-shake" : ""}`}
-      onAnimationEnd={(e) => {
-        if (e.animationName === "hudShake") setShaking(false);
-      }}
-    >
-      {/* 敵味方のゲージ */}
-      <div className="relative space-y-2">
-        <Gauge
-          label={`${ZAIRA.name}（敵）`}
-          value={state.zairaHp}
-          max={ZAIRA.hp}
-          pct={hpPct}
-          color="copper"
-        />
-        <div className="relative">
-          <Gauge
-            label="あなたのジアドスフィア"
-            value={state.pcZs}
-            max={PC.zsMax}
-            pct={zsPct}
-            color="gold"
-            flash={shaking}
-          />
-          {state.charging && (
-            <span className="absolute -top-1 right-0 rounded border border-hud-warning/60 bg-hud-warning/10 px-1.5 py-0.5 font-mono-hud text-[10px] tracking-[0.2em] text-hud-warning">
-              EXPOSED
-            </span>
-          )}
-        </div>
-        {/* ダメージ数字のポップ（ゲージの数値と重ならないよう右からずらす） */}
-        {playerDamage > 0 && state.phase !== "player-turn" && (
-          <span
-            key={`pdmg-${state.round}-${state.log.length}`}
-            className="damage-pop absolute -top-3 right-16 font-mono-hud text-lg font-bold text-hud-gold-bright"
-          >
-            -{playerDamage}
-          </span>
-        )}
-        {enemyDamage > 0 && (
-          <span
-            key={`edmg-${state.round}-${state.log.length}`}
-            className="damage-pop absolute bottom-6 right-16 font-mono-hud text-lg font-bold text-hud-warning"
-          >
-            -{enemyDamage}
-          </span>
-        )}
-      </div>
-
-      <p className="text-center font-mono-hud text-xs tracking-[0.2em] text-hud-text-muted">
-        ROUND {state.round}
-      </p>
-
-      {/* ログ（末尾だけ見せる） */}
-      <BattleLog state={state} />
-
-      {/* プレイヤーの手番 */}
-      {state.phase === "player-turn" && (
-        <div className="space-y-2">
-          <div className="rounded-md border border-hud-gold/40 bg-hud-gold/5 px-3 py-2">
-            <p className="font-mono-hud text-[11px] tracking-[0.3em] text-hud-gold">
-              YOUR TURN
-            </p>
-            <p className="mt-0.5 text-sm text-hud-text">
-              {state.charging
-                ? "――突入中。溜めた一撃を解放する。"
-                : "――あなたの手番。どう攻める？"}
-            </p>
-            <p className="mt-1 text-xs text-hud-text-muted">
-              敵の攻撃予告：{state.incoming.label}
-              {state.incoming.coordinateAttack && (
-                <span className="ml-1 text-hud-warning">
-                  （ジグスラストで回避不能）
-                </span>
-              )}
-            </p>
-          </div>
-          {attackOptionsFor(state).map((opt) => (
-            <button
-              key={opt.mode}
-              onClick={() => dispatch({ type: "attack", mode: opt.mode })}
-              className="block w-full rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3.5 text-left transition-colors hover:bg-hud-gold/20"
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-medium text-hud-gold-bright">{opt.label}</span>
-                {opt.mode === "double" && (
-                  <span className="rounded border border-hud-gold/40 px-1 py-px font-mono-hud text-[10px] text-hud-gold">
-                    2回判定
-                  </span>
-                )}
-                {opt.mode === "charge" && (
-                  <span className="rounded border border-hud-warning/50 px-1 py-px font-mono-hud text-[10px] text-hud-warning">
-                    無防備
-                  </span>
-                )}
-              </span>
-              <span className="mt-0.5 block text-xs text-hud-text-muted">{opt.hint}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* 回避選択（敵の攻撃予告つき） */}
-      {state.phase === "evade-prompt" && (
-        <div className="space-y-2">
-          <p className="alert-pulse rounded border border-hud-warning/60 bg-hud-warning/10 px-3 py-2 font-mono-hud text-xs tracking-[0.2em] text-hud-warning">
-            WARNING // {state.incoming.label}
-            <span className="mt-1 block text-[13px] font-normal normal-case tracking-normal text-hud-text">
-              {state.incoming.flavor}
-            </span>
-          </p>
-          <p className="text-sm text-hud-text">
-            敵の攻撃が来る。ジグスラストで回避する？（コスト：ZS −{JIG_THRUST_COST}）
-          </p>
-          <button
-            onClick={() => dispatch({ type: "evade", evade: true })}
-            disabled={state.pcZs <= JIG_THRUST_COST}
-            className="flex w-full items-center gap-2 rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3.5 text-left transition-colors hover:bg-hud-gold/20 disabled:opacity-40"
-          >
-            <Zap size={16} className="shrink-0 text-hud-gold-bright" />
-            <span>
-              <span className="block text-sm font-medium text-hud-gold-bright">ジグスラストで回避する</span>
-              <span className="text-xs text-hud-text-muted">
-                {state.pcZs <= JIG_THRUST_COST
-                  ? `残りZSがコスト以下のため使えない（払うと機関停止する）`
-                  : `敵の目標値 −${JIG_THRUST_CELLS}。避けられる可能性が上がる`}
-              </span>
-            </span>
-          </button>
-          <button
-            onClick={() => dispatch({ type: "evade", evade: false })}
-            className="flex w-full items-center gap-2 rounded-md border border-hud-border bg-hud-panel px-4 py-3.5 text-left transition-colors hover:border-hud-copper/60"
-          >
-            <Shield size={16} className="shrink-0 text-hud-text-muted" />
-            <span>
-              <span className="block text-sm text-hud-text">そのまま受ける</span>
-              <span className="text-xs text-hud-text-muted">コストを払わず、ダメージ軽減で耐える</span>
-            </span>
-          </button>
-        </div>
-      )}
-
-      {/* ラウンド終了 */}
-      {state.phase === "enemy-resolved" && (
-        <button
-          onClick={() => dispatch({ type: "next" })}
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
-        >
-          次のラウンドへ
-          <ChevronRight size={16} />
-        </button>
-      )}
-
-      {/* 勝利 */}
-      {state.phase === "won" && (
-        <div className="space-y-3">
-          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-gold-bright">
-            TARGET NEUTRALIZED
-          </p>
-          <p className="text-center text-sm text-hud-text-muted">―― ザイラ、撃破 ――</p>
-          <button
-            onClick={() => onEnd(lostCount > 0 ? "lost-then-won" : "won")}
-            className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
-          >
-            エンディングへ
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* 敗北（リトライ可） */}
-      {state.phase === "lost" && (
-        <div className="space-y-3">
-          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-warning">
-            SYSTEM FAILURE
-          </p>
-          <p className="text-center text-sm leading-relaxed text-hud-warning">
-            機関停止。――だが、姉貴分があなたの機体を引きずって退避させる。
-            <br />
-            まだ、やり直せる。
-          </p>
-          <p className="text-center text-xs leading-relaxed text-hud-text-muted">
-            ヒント：敵の攻撃に「ジグスラストで回避する」を使うと、被弾がぐっと減ります。
-            大きく削りたいときは「チャージアタック」。
-          </p>
-          <button
-            onClick={() => {
-              setLostCount((c) => c + 1);
-              dispatch({ type: "retry" });
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
-          >
-            <RotateCcw size={16} />
-            もう一度挑戦する
-          </button>
-        </div>
-      )}
-    </div>
-  );
+function shortPhase(state: CombatState) {
+  switch (state.phase) {
+    case "player-turn": return "攻撃を選ぶ";
+    case "evade-prompt":
+    case "enemy-ready": return "敵の反撃";
+    case "enemy-resolved": return "結果確認";
+    case "won": return "撃破";
+    case "lost": return "機関停止";
+  }
 }
 
-function Gauge({
-  label,
-  value,
-  max,
-  pct,
-  color,
-  flash,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  pct: number;
-  color: "gold" | "copper";
-  flash?: boolean;
-}) {
-  const barColor = color === "gold" ? "bg-hud-gold" : "bg-hud-copper";
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span className="text-hud-text-muted">{label}</span>
-        <span className="text-hud-text">
-          {value} / {max}
-        </span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-hud-panel">
-        <div
-          className={`h-full rounded-full ${barColor} transition-all duration-500 ${flash ? "gauge-flash" : ""}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
+function attackHint(mode: AttackMode) {
+  if (mode === "slash") return `ダイス${KUROAYA.burst}個。${KUROAYA.target}以下で成功。成功1個につき${KUROAYA.power}ダメージ`;
+  if (mode === "double") return `両手で2回攻撃。各ダイス${KUROAYA.burst}個。${KUROAYA.target - DOUBLE_TRIGGER_PENALTY}以下で成功`;
+  if (mode === "charge") return `今回は突入。次の手番に威力${CHARGE_ATTACK_MULTIPLIER}倍。突入中は回避できません`;
+  return `ダイス${KUROAYA.burst}個。${KUROAYA.target}以下で成功。成功1個につき${KUROAYA.power * CHARGE_ATTACK_MULTIPLIER}ダメージ`;
 }
 
-function BattleLog({ state }: { state: CombatState }) {
-  // 直近のラウンドぶんだけ見せる（長くなりすぎないように）
-  const shown = state.log.filter((e) => e.round >= state.round - 1).slice(-8);
-  const boxRef = useRef<HTMLDivElement>(null);
-  // 新しいログが来たらボックス内を最下部へ（ページではなくログ内だけをスクロール）
-  useEffect(() => {
-    const el = boxRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [state.log.length]);
-  return (
-    <div
-      ref={boxRef}
-      className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-hud-border bg-hud-panel/60 p-3"
-    >
-      <p className="font-mono-hud text-[10px] tracking-[0.3em] text-hud-gold-dim">
-        COMBAT LOG
-      </p>
-      {shown.map((entry, i) => (
-        <div key={i} className="beat-in">
-          <p
-            className={`text-xs leading-relaxed ${
-              entry.actor === "pc"
-                ? "text-hud-gold-bright/90"
-                : entry.actor === "zaira"
-                  ? "text-hud-copper/90"
-                  : "text-hud-text-muted"
-            }`}
-          >
-            {entry.text}
-          </p>
-          {entry.judgement && <DiceRow judgement={entry.judgement} />}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DiceRow({ judgement }: { judgement: AttackJudgement }) {
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
-      {judgement.dice.map((d: JudgeDie, i: number) => (
-        <span
-          key={i}
-          className={`die-in flex h-7 w-7 items-center justify-center rounded border font-mono-hud text-xs ${
-            d.isCritical
-              ? "die-crit border-hud-gold-bright bg-hud-gold/30 font-bold text-hud-gold-bright"
-              : d.isSuccess
-                ? "border-hud-gold/50 bg-hud-gold/10 text-hud-gold-bright"
-                : "border-hud-border text-hud-text-muted"
-          }`}
-          style={{ animationDelay: `${i * 90}ms` }}
-          title={d.wave > 0 ? `振り足し${d.wave}回目` : undefined}
-        >
-          {d.value}
-        </span>
-      ))}
-      <span className="ml-1 text-xs text-hud-text-muted">
-        成功{judgement.successes}
-        {judgement.criticals > 0 && `・クリティカル${judgement.criticals}`}
-        {judgement.appliedDamage !== null && `・${judgement.appliedDamage}ダメージ`}
-      </span>
-    </div>
-  );
+function describeRoll(state: CombatState, pending: Pending) {
+  if (pending.type === "enemy") {
+    const target = Math.max(0, state.incoming.target - (pending.evade ? JIG_THRUST_CELLS : 0));
+    return { title: `ザイラの${state.incoming.label}`, count: state.incoming.burst, description: `10面ダイス${state.incoming.burst}個。${target}以下で命中。${pending.evade ? `回避で目標値を${JIG_THRUST_CELLS}下げます。` : ""}受けるダメージから装甲の軽減${PC.damageReduction}を引きます。` };
+  }
+  const option = attackOptionsFor(state).find((item) => item.mode === pending.mode)!;
+  const target = KUROAYA.target - (pending.mode === "double" ? DOUBLE_TRIGGER_PENALTY : 0);
+  const power = KUROAYA.power * (pending.mode === "release" ? CHARGE_ATTACK_MULTIPLIER : 1);
+  return { title: option.label, count: KUROAYA.burst * (pending.mode === "double" ? 2 : 1), description: pending.mode === "charge" ? "次の手番の一撃に備えて突入します。この行動ではダイスを振りません。" : `10面ダイス${KUROAYA.burst}個${pending.mode === "double" ? "を右手・左手で1回ずつ" : ""}。${target}以下で成功。成功1個につき${power}ダメージ。出目1は追加で振ります。` };
 }

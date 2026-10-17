@@ -50,7 +50,7 @@ function simulate(
         let mode = attack(s);
         if (!legal.includes(mode)) mode = legal[0];
         s = playerAttack(s, mode);
-      } else if (s.phase === "evade-prompt") {
+      } else if (s.phase === "evade-prompt" || s.phase === "enemy-ready") {
         s = resolveEnemyAttack(s, evade(s));
       } else if (s.phase === "enemy-resolved") {
         s = nextRound(s);

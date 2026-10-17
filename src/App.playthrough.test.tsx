@@ -102,6 +102,18 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
     const engage = screen.queryByRole("button", { name: /ザイラに交戦する/ });
     if (engage) {
       await tap(engage);
+      expect(screen.queryByRole("heading", { name: "超高速突入" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/ロケットブースタによる音速超過/)).not.toBeInTheDocument();
+      continue;
+    }
+    const roll = screen.queryByRole("button", { name: "ダイスを振る" });
+    if (roll) {
+      await tap(roll);
+      continue;
+    }
+    const commitCharge = screen.queryByRole("button", { name: "突入する" });
+    if (commitCharge) {
+      await tap(commitCharge);
       continue;
     }
     const end = screen.queryByRole("button", { name: /エンディングへ/ });

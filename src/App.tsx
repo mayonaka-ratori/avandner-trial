@@ -131,10 +131,11 @@ export default function App() {
     [persist],
   );
 
-  // 「ザイラに交戦する」が押されたら、現れた戦闘UIまでスクロールする
+  // 交戦を始めたら物語を片づけ、戦闘画面の先頭に移る。
   useEffect(() => {
     if (engaged) {
-      battleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.scrollTo({ top: 0 });
+      battleRef.current?.focus({ preventScroll: true });
     }
   }, [engaged]);
 
@@ -206,9 +207,9 @@ export default function App() {
 
   return (
     <main className="min-h-dvh">
-      <SystemChrome status={scene.kicker ?? undefined} reading />
+      <SystemChrome status={engaged ? "交戦中" : scene.kicker ?? undefined} reading />
       <div key={scene.id} className="scene-in">
-        <SceneView
+        {!engaged && <SceneView
           scene={scene}
           offline={offline}
           choiceLog={play.choiceLog}
@@ -230,11 +231,12 @@ export default function App() {
             }
             if (scene.next) advance(scene.next, record);
           }}
-        />
+        />}
         {scene.interaction.type === "combat" && engaged && (
           <div
             ref={battleRef}
-            className="mx-auto w-full max-w-xl scroll-mt-2 px-5 pb-8 safe-area-bottom"
+            tabIndex={-1}
+            className="battle-root"
           >
             <BattleView
               onEnd={(result) => {
