@@ -125,6 +125,10 @@ export default async function handler(request: Request): Promise<Response> {
   if (!apiKey) {
     return Response.json({ error: "not configured" }, { status: 503, headers });
   }
+  if (!/^[\x21-\x7e]+$/.test(apiKey)) {
+    console.error("OpenAI key contains invalid characters");
+    return Response.json({ error: "not configured" }, { status: 503, headers });
+  }
 
   let body: NarrateRequest;
   try {
@@ -158,6 +162,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  let stage = "request";
   try {
     const res = await fetch(OPENAI_URL, {
       method: "POST",
@@ -177,6 +182,7 @@ export default async function handler(request: Request): Promise<Response> {
       }),
       signal: controller.signal,
     });
+    stage = "response";
     if (!res.ok) {
       // キーや入力文を記録せず、管理画面で失敗の種類を確認できるようにする。
       const detail = await res.json().catch(() => null) as {
@@ -198,8 +204,14 @@ export default async function handler(request: Request): Promise<Response> {
     }
     return Response.json({ text }, { headers });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     console.error("OpenAI connection failed", {
+      stage,
       name: error instanceof Error ? error.name : "unknown",
+      reason: /header|ByteString|character|ISO-8859/i.test(message) ? "header"
+        : /abort|timeout/i.test(message) ? "timeout"
+        : /json|unexpected token/i.test(message) ? "json"
+        : /fetch|network/i.test(message) ? "network" : "unknown",
     });
     return Response.json({ error: "upstream" }, { status: 502, headers });
   } finally {
