@@ -176,6 +176,15 @@ export default async function handler(request: Request): Promise<Response> {
       signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
     });
     if (!res.ok) {
+      // キーや入力文を記録せず、管理画面で失敗の種類を確認できるようにする。
+      const detail = await res.json().catch(() => null) as {
+        error?: { code?: string; type?: string };
+      } | null;
+      console.error("OpenAI request failed", {
+        status: res.status,
+        code: detail?.error?.code,
+        type: detail?.error?.type,
+      });
       return Response.json({ error: "upstream" }, { status: 502, headers });
     }
     const data = (await res.json()) as {
