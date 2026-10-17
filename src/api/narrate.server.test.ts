@@ -87,6 +87,13 @@ describe("api/narrate", () => {
     expect(res.status).toBe(503);
   });
 
+  it("キーに説明文や空白が混じっていたら外部へ送らない", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test キー");
+    const res = await handler(req({ scene: "awakening" }));
+    expect(res.status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("上流が成功すれば text を返し、自由入力がプロンプトに渡る", async () => {
     vi.stubEnv("OPENAI_API_KEY", " test-key\n");
     const res = await handler(
