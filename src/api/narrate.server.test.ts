@@ -8,7 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import handler from "./narrate";
+import handler from "../../api/narrate";
 
 const URL = "https://avandner-trial.vercel.app/api/narrate";
 const GOOD_ORIGIN = "https://mayonaka-ratori.github.io";

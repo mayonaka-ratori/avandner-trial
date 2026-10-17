@@ -41,7 +41,7 @@ npm run qr
 
 1. Vercelで `mayonaka-ratori/avandner-trial` を取り込む。
 2. 環境変数 `OPENAI_API_KEY` と `TRIAL_ENABLED=true` を設定して公開する。
-3. `VITE_API_BASE` を空文字にする。同じ公開先の `/api/` を呼びます。
+3. Vercelでは `VITE_API_BASE` の設定は不要です。同じ公開先の `/api/` を呼びます。
 4. `vercel.json` がVercel用のファイルの置き場所を指定します。画面は `/` で開けます。
 5. Vercelの公開URLの `/api/status` が `{"enabled":true}` を返すことと、実際に文章が生成されることを確認する。
 6. GitHubのSettings → Secrets and variables → Actions → Variablesに

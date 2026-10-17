@@ -9,7 +9,7 @@
 /** 中継 API のベース URL。ビルド時に差し替え可能 */
 const API_BASE: string =
   (import.meta.env.VITE_API_BASE as string | undefined) ??
-  "https://avandner-trial.vercel.app";
+  (import.meta.env.BASE_URL === "/" ? "" : "https://avandner-trial.vercel.app");
 
 // 文章を生成するサーバーを使わない公開では、通信を待たず予備文章で進める。
 const STATIC_MODE = import.meta.env.VITE_TRIAL_MODE === "static";

@@ -42,4 +42,15 @@ describe("公開時の通信設定", () => {
     expect(await client.checkStatus()).toBe("closed");
     expect(fetch.mock.calls[0][0]).toBe("/api/status");
   });
+
+  it("VercelではURLを指定しなくても同じ公開先に問い合わせる", async () => {
+    vi.stubEnv("VITE_TRIAL_MODE", "online");
+    vi.stubEnv("VITE_API_BASE", undefined);
+    vi.stubEnv("BASE_URL", "/");
+    const fetch = vi.fn().mockResolvedValue(Response.json({ enabled: true }));
+    vi.stubGlobal("fetch", fetch);
+    const client = await import("./client");
+    expect(await client.checkStatus()).toBe("ok");
+    expect(fetch.mock.calls[0][0]).toBe("/api/status");
+  });
 });
