@@ -3,20 +3,25 @@
 /*
  * 体験版の配色 — avandner-app の黒×金のテーマを、このアプリ用に最小限で抜き出したもの。
  * 背景は暖かみのある黒、見出しとアクセントは金、サブアクセントは銅。
+ * 文字色はスマホでの読みやすさ優先。意味のある文に使う色は背景との
+ * コントラスト 4.5:1 以上を確保する。
+ *   金系 …… プレイヤー側・進行・味方の情報
+ *   銅系 …… 敵（ザイラ）の情報
+ *   朱系 …… 警告・危険（WARNING / 被弾の注意）専用。敵色とは別にする
  */
 @theme {
   --color-hud-bg: #0b0a06;
   --color-hud-panel: #15130c;
   --color-hud-text: #e2ddd0;
-  --color-hud-text-muted: #7a715c;
+  --color-hud-text-muted: #9a917e;
   --color-hud-heading: #fdf6e3;
   --color-hud-gold: #d4af37;
   --color-hud-gold-bright: #e8c556;
-  --color-hud-gold-dim: #826416;
+  --color-hud-gold-dim: #a08428;
   --color-hud-copper: #e0846b;
   --color-hud-copper-dim: #9d4d30;
   --color-hud-border: rgba(122, 98, 32, 0.45);
-  --color-hud-danger: #d4183d;
+  --color-hud-warning: #ff6f4d;
   --font-mono-hud: "Consolas", "Menlo", "Noto Sans Mono", "Courier New",
     monospace;
 }
@@ -78,8 +83,8 @@ body {
 .hud-vignette {
   background: radial-gradient(
     ellipse at center,
-    transparent 55%,
-    rgba(0, 0, 0, 0.45) 100%
+    transparent 62%,
+    rgba(0, 0, 0, 0.3) 100%
   );
 }
 

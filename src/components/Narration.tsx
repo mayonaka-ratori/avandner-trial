@@ -104,9 +104,9 @@ export function Narration({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-6 text-hud-text-muted">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-hud-gold" />
-        <span className="font-mono-hud text-xs tracking-[0.15em]">
+      <div className="flex items-center gap-3 py-8 text-hud-text-muted">
+        <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-hud-gold" />
+        <span className="font-mono-hud text-sm tracking-[0.15em]">
           応答を解析中…
         </span>
       </div>
@@ -152,6 +152,15 @@ export function Narration({
           </p>
         );
       })}
+      {/* タイピング中だけ出すスキップ案内。タップ対象は親の領域全体 */}
+      {!done && (
+        <p
+          className="pt-1 text-right font-mono-hud text-[11px] tracking-[0.2em] text-hud-gold-dim"
+          aria-hidden="true"
+        >
+          TAP TO SHOW ALL ▶▶
+        </p>
+      )}
     </div>
   );
 }

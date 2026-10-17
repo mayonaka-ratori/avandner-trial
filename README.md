@@ -22,7 +22,7 @@ TRPG『黒絢のアヴァンドナー』（著: 瀧里フユ ／ 発行: どら�
 - **中継**: `api/` の Vercel Functions が OpenAI を呼ぶ。キーはサーバーの環境変数にのみ置く
 - **フォールバック**: 全場面に書き下ろしの予備文章があり、API・電波・Vercel の
   どれが死んでも最後まで遊べる
-- **当日限定**: `TRIAL_ENABLED=false` で「体験終了」画面に切り替わる（キルスイッチ）
+- **公開の切り替え**: GitHub Pagesだけで遊べます。AIによる文章の生成を使う場合は、Vercel側の `TRIAL_ENABLED=false` で終了案内を出せます
 
 ## コマンド
 
@@ -43,12 +43,10 @@ npm run qr         # qr.png を生成
   こちらにも同じ修正を当ててください。逆にこちらで直したものを本家へ
   戻す必要が出たときも同様です
 
-## 公開手順（当日までにやること）
+## 明日のイベント向けの公開
 
-詳しくは [docs/DEPLOY.md](docs/DEPLOY.md) を読んでください。概要は:
+GitHub Pagesで、用意済みの文章を使って最後まで遊べます。文章を生成するサーバーのURLを登録するまでは、外部への問い合わせによる待ち時間がありません。
 
-1. GitHub リポジトリ `mayonaka-ratori/avandner-trial` に push
-2. リポジトリ Settings → Pages → Source を「GitHub Actions」に
-3. Vercel にリポジトリを接続し、環境変数 `OPENAI_API_KEY`（と `TRIAL_ENABLED=true`）を設定
-4. `npm run qr` で QR を生成して印刷
-5. 終了後は Vercel の環境変数を `TRIAL_ENABLED=false` に
+`main` に変更を送ると自動で検査して公開します。印刷用のQRは `qr.png` です。公開後はスマホで確認してください。
+
+AIの文章生成の追加、当日の確認、公開の停止は [docs/DEPLOY.md](docs/DEPLOY.md) にまとめました。画面を開くときと再読み込みするときには、インターネット接続が必要です。

@@ -43,10 +43,10 @@ export function TitleScreen({ onStart, onResume, canResume, offline }: TitleScre
           外部通信リンク未確立 ― オフライン記録で進行します（内容は同じです）。
         </p>
       )}
-      <div className="mt-10 flex flex-col items-center gap-3">
+      <div className="mt-10 flex w-full max-w-xs flex-col items-center gap-3">
         <button
           onClick={onStart}
-          className="flex items-center gap-2 rounded-md border border-hud-gold/50 bg-hud-gold/10 px-8 py-3 text-hud-gold-bright transition-colors hover:bg-hud-gold/20"
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-10 py-4 text-base font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
         >
           <Swords size={18} />
           物語をはじめる
@@ -54,13 +54,13 @@ export function TitleScreen({ onStart, onResume, canResume, offline }: TitleScre
         {canResume && onResume && (
           <button
             onClick={onResume}
-            className="text-sm text-hud-text-muted underline underline-offset-4 hover:text-hud-text"
+            className="flex w-full items-center justify-center rounded-md border border-hud-border bg-hud-panel/60 px-6 py-3 text-sm text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
           >
             途中から再開する
           </button>
         )}
       </div>
-      <p className="mt-12 text-[10px] leading-relaxed text-hud-text-muted">
+      <p className="mt-12 text-[11px] leading-relaxed text-hud-text-muted">
         『黒絢のアヴァンドナー』（著：瀧里フユ／発行：どらこにあん）
         <br />
         本アプリはイベント会場での試遊用です

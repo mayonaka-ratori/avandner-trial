@@ -11,12 +11,17 @@ const API_BASE: string =
   (import.meta.env.VITE_API_BASE as string | undefined) ??
   "https://avandner-trial.vercel.app";
 
-const TIMEOUT_MS = 15_000;
+// 文章を生成するサーバーを使わない公開では、通信を待たず予備文章で進める。
+const STATIC_MODE = import.meta.env.VITE_TRIAL_MODE === "static";
+
+// 会場の不安定な回線で長く待たせない。切れても fallback 文章に切り替わるので早めに諦める
+const TIMEOUT_MS = 8_000;
 
 export type TrialStatus = "ok" | "closed" | "error";
 
 /** 体験版が利用可能かを確認する。error はネットワーク不通など判別不能な場合 */
 export async function checkStatus(): Promise<TrialStatus> {
+  if (STATIC_MODE) return "error";
   try {
     const res = await fetchWithTimeout(`${API_BASE}/api/status`, {
       method: "GET",
@@ -45,6 +50,7 @@ export async function narrate(
   sceneKey: string,
   options: NarrateOptions = {},
 ): Promise<string | null> {
+  if (STATIC_MODE) return null;
   try {
     const res = await fetchWithTimeout(`${API_BASE}/api/narrate`, {
       method: "POST",

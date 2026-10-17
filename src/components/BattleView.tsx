@@ -80,16 +80,16 @@ export function BattleView({ onEnd }: BattleViewProps) {
             flash={shaking}
           />
           {state.charging && (
-            <span className="absolute -top-1 right-0 rounded border border-hud-copper/60 bg-hud-copper/10 px-1.5 py-0.5 font-mono-hud text-[9px] tracking-[0.2em] text-hud-copper">
+            <span className="absolute -top-1 right-0 rounded border border-hud-warning/60 bg-hud-warning/10 px-1.5 py-0.5 font-mono-hud text-[10px] tracking-[0.2em] text-hud-warning">
               EXPOSED
             </span>
           )}
         </div>
-        {/* ダメージ数字のポップ */}
+        {/* ダメージ数字のポップ（ゲージの数値と重ならないよう右からずらす） */}
         {playerDamage > 0 && state.phase !== "player-turn" && (
           <span
             key={`pdmg-${state.round}-${state.log.length}`}
-            className="damage-pop absolute -top-3 right-0 font-mono-hud text-lg font-bold text-hud-gold-bright"
+            className="damage-pop absolute -top-3 right-16 font-mono-hud text-lg font-bold text-hud-gold-bright"
           >
             -{playerDamage}
           </span>
@@ -97,7 +97,7 @@ export function BattleView({ onEnd }: BattleViewProps) {
         {enemyDamage > 0 && (
           <span
             key={`edmg-${state.round}-${state.log.length}`}
-            className="damage-pop absolute bottom-6 right-0 font-mono-hud text-lg font-bold text-hud-copper"
+            className="damage-pop absolute bottom-6 right-16 font-mono-hud text-lg font-bold text-hud-warning"
           >
             -{enemyDamage}
           </span>
@@ -114,18 +114,43 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* プレイヤーの手番 */}
       {state.phase === "player-turn" && (
         <div className="space-y-2">
-          <p className="text-sm text-hud-text-muted">
-            {state.charging
-              ? "――突入中。溜めた一撃を解放する。"
-              : "――あなたの手番。どう攻める？"}
-          </p>
+          <div className="rounded-md border border-hud-gold/40 bg-hud-gold/5 px-3 py-2">
+            <p className="font-mono-hud text-[11px] tracking-[0.3em] text-hud-gold">
+              YOUR TURN
+            </p>
+            <p className="mt-0.5 text-sm text-hud-text">
+              {state.charging
+                ? "――突入中。溜めた一撃を解放する。"
+                : "――あなたの手番。どう攻める？"}
+            </p>
+            <p className="mt-1 text-xs text-hud-text-muted">
+              敵の攻撃予告：{state.incoming.label}
+              {state.incoming.coordinateAttack && (
+                <span className="ml-1 text-hud-warning">
+                  （ジグスラストで回避不能）
+                </span>
+              )}
+            </p>
+          </div>
           {attackOptionsFor(state).map((opt) => (
             <button
               key={opt.mode}
               onClick={() => dispatch({ type: "attack", mode: opt.mode })}
-              className="block w-full rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3 text-left transition-colors hover:bg-hud-gold/20"
+              className="block w-full rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3.5 text-left transition-colors hover:bg-hud-gold/20"
             >
-              <span className="text-sm font-medium text-hud-gold-bright">{opt.label}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-medium text-hud-gold-bright">{opt.label}</span>
+                {opt.mode === "double" && (
+                  <span className="rounded border border-hud-gold/40 px-1 py-px font-mono-hud text-[10px] text-hud-gold">
+                    2回判定
+                  </span>
+                )}
+                {opt.mode === "charge" && (
+                  <span className="rounded border border-hud-warning/50 px-1 py-px font-mono-hud text-[10px] text-hud-warning">
+                    無防備
+                  </span>
+                )}
+              </span>
               <span className="mt-0.5 block text-xs text-hud-text-muted">{opt.hint}</span>
             </button>
           ))}
@@ -135,19 +160,19 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* 回避選択（敵の攻撃予告つき） */}
       {state.phase === "evade-prompt" && (
         <div className="space-y-2">
-          <p className="alert-pulse rounded border border-hud-copper/60 bg-hud-copper/10 px-3 py-2 font-mono-hud text-[10px] tracking-[0.25em] text-hud-copper">
+          <p className="alert-pulse rounded border border-hud-warning/60 bg-hud-warning/10 px-3 py-2 font-mono-hud text-xs tracking-[0.2em] text-hud-warning">
             WARNING // {state.incoming.label}
-            <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-hud-text-muted">
+            <span className="mt-1 block text-[13px] font-normal normal-case tracking-normal text-hud-text">
               {state.incoming.flavor}
             </span>
           </p>
-          <p className="text-sm text-hud-text-muted">
+          <p className="text-sm text-hud-text">
             敵の攻撃が来る。ジグスラストで回避する？（コスト：ZS −{JIG_THRUST_COST}）
           </p>
           <button
             onClick={() => dispatch({ type: "evade", evade: true })}
             disabled={state.pcZs <= JIG_THRUST_COST}
-            className="flex w-full items-center gap-2 rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3 text-left transition-colors hover:bg-hud-gold/20 disabled:opacity-40"
+            className="flex w-full items-center gap-2 rounded-md border border-hud-gold/40 bg-hud-gold/10 px-4 py-3.5 text-left transition-colors hover:bg-hud-gold/20 disabled:opacity-40"
           >
             <Zap size={16} className="shrink-0 text-hud-gold-bright" />
             <span>
@@ -161,7 +186,7 @@ export function BattleView({ onEnd }: BattleViewProps) {
           </button>
           <button
             onClick={() => dispatch({ type: "evade", evade: false })}
-            className="flex w-full items-center gap-2 rounded-md border border-hud-border bg-hud-panel px-4 py-3 text-left transition-colors hover:border-hud-copper/60"
+            className="flex w-full items-center gap-2 rounded-md border border-hud-border bg-hud-panel px-4 py-3.5 text-left transition-colors hover:border-hud-copper/60"
           >
             <Shield size={16} className="shrink-0 text-hud-text-muted" />
             <span>
@@ -176,7 +201,7 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {state.phase === "enemy-resolved" && (
         <button
           onClick={() => dispatch({ type: "next" })}
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/10 px-6 py-3 text-hud-gold-bright transition-colors hover:bg-hud-gold/20"
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
         >
           次のラウンドへ
           <ChevronRight size={16} />
@@ -192,7 +217,7 @@ export function BattleView({ onEnd }: BattleViewProps) {
           <p className="text-center text-sm text-hud-text-muted">―― ザイラ、撃破 ――</p>
           <button
             onClick={() => onEnd(lostCount > 0 ? "lost-then-won" : "won")}
-            className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3 text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
+            className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
           >
             エンディングへ
             <ChevronRight size={16} />
@@ -203,10 +228,10 @@ export function BattleView({ onEnd }: BattleViewProps) {
       {/* 敗北（リトライ可） */}
       {state.phase === "lost" && (
         <div className="space-y-3">
-          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-copper">
+          <p className="stamp-in text-center font-mono-hud text-lg tracking-[0.35em] text-hud-warning">
             SYSTEM FAILURE
           </p>
-          <p className="text-center text-sm leading-relaxed text-hud-copper">
+          <p className="text-center text-sm leading-relaxed text-hud-warning">
             機関停止。――だが、姉貴分があなたの機体を引きずって退避させる。
             <br />
             まだ、やり直せる。
@@ -220,7 +245,7 @@ export function BattleView({ onEnd }: BattleViewProps) {
               setLostCount((c) => c + 1);
               dispatch({ type: "retry" });
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-hud-copper/50 bg-hud-copper/10 px-6 py-3 text-hud-copper transition-colors hover:bg-hud-copper/20"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
           >
             <RotateCcw size={16} />
             もう一度挑戦する
@@ -268,9 +293,18 @@ function Gauge({
 function BattleLog({ state }: { state: CombatState }) {
   // 直近のラウンドぶんだけ見せる（長くなりすぎないように）
   const shown = state.log.filter((e) => e.round >= state.round - 1).slice(-8);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 新しいログが来たらボックス内を最下部へ（ページではなくログ内だけをスクロール）
+  useEffect(() => {
+    const el = boxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [state.log.length]);
   return (
-    <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-hud-border bg-hud-panel/60 p-3">
-      <p className="font-mono-hud text-[9px] tracking-[0.3em] text-hud-gold-dim">
+    <div
+      ref={boxRef}
+      className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-hud-border bg-hud-panel/60 p-3"
+    >
+      <p className="font-mono-hud text-[10px] tracking-[0.3em] text-hud-gold-dim">
         COMBAT LOG
       </p>
       {shown.map((entry, i) => (
@@ -299,7 +333,7 @@ function DiceRow({ judgement }: { judgement: AttackJudgement }) {
       {judgement.dice.map((d: JudgeDie, i: number) => (
         <span
           key={i}
-          className={`die-in flex h-6 w-6 items-center justify-center rounded border font-mono-hud text-[11px] ${
+          className={`die-in flex h-7 w-7 items-center justify-center rounded border font-mono-hud text-xs ${
             d.isCritical
               ? "die-crit border-hud-gold-bright bg-hud-gold/30 font-bold text-hud-gold-bright"
               : d.isSuccess
@@ -312,7 +346,7 @@ function DiceRow({ judgement }: { judgement: AttackJudgement }) {
           {d.value}
         </span>
       ))}
-      <span className="ml-1 text-[10px] text-hud-text-muted">
+      <span className="ml-1 text-xs text-hud-text-muted">
         成功{judgement.successes}
         {judgement.criticals > 0 && `・クリティカル${judgement.criticals}`}
         {judgement.appliedDamage !== null && `・${judgement.appliedDamage}ダメージ`}

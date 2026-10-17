@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { checkStatus } from "@/api/client";
 import { FIRST_SCENE, getScene } from "@/scenes/scenes";
 import type { ChoiceRecord } from "@/scenes/types";
@@ -18,6 +18,7 @@ interface PlayState {
   startedAt: number;
 }
 
+// 英語表記を直しても、保存済みの続きから遊べるよう内部名は変えない。
 const SAVE_KEY = "avandnar-trial-save";
 
 /** choiceLog の1要素を ChoiceRecord に正規化する。変換できなければ null */
@@ -69,6 +70,9 @@ export default function App() {
     startedAt: Date.now(),
   });
   const [saved, setSaved] = useState<PlayState | null>(null);
+  /** combat シーンで「ザイラに交戦する」が押されたか。押すまで戦闘UIは出さない */
+  const [engaged, setEngaged] = useState(false);
+  const battleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkStatus().then((status) => {
@@ -99,12 +103,14 @@ export default function App() {
     };
     setPlay(fresh);
     persist(fresh);
+    setEngaged(false);
     setPhase("boot");
   }, [persist]);
 
   const resume = useCallback(() => {
     if (!saved) return;
     setPlay(saved);
+    setEngaged(false);
     setPhase("playing");
   }, [saved]);
 
@@ -119,10 +125,18 @@ export default function App() {
         persist(next);
         return next;
       });
+      setEngaged(false);
       window.scrollTo({ top: 0 });
     },
     [persist],
   );
+
+  // 「ザイラに交戦する」が押されたら、現れた戦闘UIまでスクロールする
+  useEffect(() => {
+    if (engaged) {
+      battleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [engaged]);
 
   if (phase === "checking") {
     return (
@@ -151,7 +165,7 @@ export default function App() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-8 rounded-md border border-hud-border bg-hud-panel px-6 py-2.5 text-sm text-hud-text hover:border-hud-gold/60"
+            className="mt-8 rounded-md border border-hud-border bg-hud-panel px-8 py-3.5 text-sm text-hud-text hover:border-hud-gold/60"
           >
             再読み込み
           </button>
@@ -204,6 +218,8 @@ export default function App() {
           choiceLog={play.choiceLog}
           battleResult={play.battleResult}
           startedAt={play.startedAt}
+          onEngage={() => setEngaged(true)}
+          engaged={engaged}
           onAdvance={(record) => {
             if (scene.interaction.type === "ending") {
               // 「もう一度遊ぶ」
@@ -219,8 +235,11 @@ export default function App() {
             if (scene.next) advance(scene.next, record);
           }}
         />
-        {scene.interaction.type === "combat" && (
-          <div className="mx-auto w-full max-w-xl px-5 pb-8 safe-area-bottom">
+        {scene.interaction.type === "combat" && engaged && (
+          <div
+            ref={battleRef}
+            className="mx-auto w-full max-w-xl scroll-mt-2 px-5 pb-8 safe-area-bottom"
+          >
             <BattleView
               onEnd={(result) => {
                 setPlay((prev) => {

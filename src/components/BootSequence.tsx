@@ -69,7 +69,7 @@ export function BootSequence({ onDone, instant = false }: BootSequenceProps) {
           />
         )}
       </div>
-      <span className="mt-10 block font-mono-hud text-[9px] tracking-[0.3em] text-hud-text-muted/60">
+      <span className="mt-10 block font-mono-hud text-[11px] tracking-[0.3em] text-hud-text-muted">
         TAP TO SKIP
       </span>
     </button>

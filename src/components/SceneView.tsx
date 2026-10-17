@@ -12,6 +12,10 @@ interface SceneViewProps {
   scene: SceneDef;
   /** 進む。choice / free でプレイヤーが入力した内容を記録するための引数 */
   onAdvance: (record?: ChoiceRecord) => void;
+  /** combat シーンで「交戦開始」が押されたとき。押すまで戦闘UIは出さない */
+  onEngage?: () => void;
+  /** 交戦開始済みなら true。開始ボタンを消して本文と戦闘UIを繋ぐ */
+  engaged?: boolean;
   /** エンディングの総括用にこれまでの選択履歴を渡す */
   choiceLog?: ChoiceRecord[];
   battleResult?: "won" | "lost-then-won";
@@ -32,6 +36,8 @@ interface SceneViewProps {
 export function SceneView({
   scene,
   onAdvance,
+  onEngage,
+  engaged = false,
   choiceLog,
   battleResult,
   startedAt,
@@ -94,14 +100,15 @@ export function SceneView({
     };
   }, [scene, choiceLog, battleResult, offline]);
 
-  // 応答文が差し込まれたら下までスクロール
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [response, freeSent]);
-
   const paragraphs = text ?? [];
   // 操作の表示は「本文が出て、さらに応答文も出し切ってから」
   const ready = revealed && (response.length === 0 || responseRevealed);
+
+  // 応答文が差し込まれたとき・操作（ボタン/入力欄）が出現したときに下までスクロール。
+  // 本文が長いと操作が画面外に出るため、出現を見せるために一度だけ下へ誘導する
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [response, freeSent, ready]);
 
   async function submitFree() {
     const input = freeText.trim();
@@ -127,9 +134,14 @@ export function SceneView({
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5 pb-8 pt-10">
+    <div
+      className={`mx-auto flex w-full max-w-xl flex-col px-5 pb-8 pt-10 safe-area-bottom ${
+        // combat は本文の下に戦闘UIが続くので、1画面分の空白を作らない
+        it.type === "combat" ? "" : "min-h-dvh"
+      }`}
+    >
       {scene.alert && (
-        <p className="alert-pulse mb-4 inline-block w-fit rounded border border-hud-copper/60 bg-hud-copper/10 px-3 py-1 font-mono-hud text-[10px] tracking-[0.3em] text-hud-copper">
+        <p className="alert-pulse mb-4 inline-block w-fit rounded border border-hud-warning/60 bg-hud-warning/10 px-3 py-1.5 font-mono-hud text-[11px] tracking-[0.25em] text-hud-warning">
           {scene.alert}
         </p>
       )}
@@ -154,10 +166,12 @@ export function SceneView({
         </div>
       )}
 
-      <div ref={bottomRef} className="mt-8" />
-
       {ready && it.type === "continue" && (
         <ContinueButton onClick={() => onAdvance()} />
+      )}
+
+      {ready && it.type === "combat" && onEngage && !engaged && (
+        <ContinueButton label="ザイラに交戦する" onClick={onEngage} />
       )}
 
       {revealed && it.type === "choice" && picked === null && (
@@ -166,10 +180,17 @@ export function SceneView({
             <button
               key={opt.id}
               onClick={() => pick(opt)}
-              className="beat-in block w-full rounded-md border border-hud-border bg-hud-panel px-4 py-3 text-left text-sm leading-relaxed text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
+              className="beat-in block w-full rounded-md border border-hud-border bg-hud-panel px-4 py-3.5 text-left text-sm leading-relaxed text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
               style={{ animationDelay: `${i * 120}ms` }}
             >
-              {opt.label}
+              <span className="flex items-start gap-2">
+                <ChevronRight
+                  size={16}
+                  className="mt-0.5 shrink-0 text-hud-gold-dim"
+                  aria-hidden="true"
+                />
+                <span>{opt.label}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -181,22 +202,22 @@ export function SceneView({
 
       {revealed && it.type === "free" && !freeSent && (
         <div className="mt-2">
-          <p className="mb-1 font-mono-hud text-[9px] tracking-[0.3em] text-hud-gold-dim">
+          <p className="mb-1 font-mono-hud text-[11px] tracking-[0.3em] text-hud-gold-dim">
             &gt; VOICE OUT
           </p>
-          <p className="mb-2 text-sm text-hud-text-muted">{it.prompt}</p>
+          <p className="mb-2 text-sm font-medium text-hud-text">{it.prompt}</p>
           <div className="flex gap-2">
             <input
               value={freeText}
               onChange={(e) => setFreeText(e.target.value.slice(0, 200))}
               onKeyDown={(e) => e.key === "Enter" && submitFree()}
               placeholder={it.placeholder}
-              className="min-w-0 flex-1 rounded-md border border-hud-border bg-hud-panel px-3 py-2.5 text-sm text-hud-text placeholder:text-hud-text-muted/70 focus:border-hud-gold/60 focus:outline-none"
+              className="min-w-0 flex-1 rounded-md border border-hud-border bg-hud-panel px-3 py-3 text-base text-hud-text placeholder:text-hud-text-muted/70 focus:border-hud-gold/60 focus:outline-none"
             />
             <button
               onClick={submitFree}
               disabled={!freeText.trim() || busy}
-              className="flex items-center gap-1.5 rounded-md border border-hud-gold/50 bg-hud-gold/10 px-4 py-2.5 text-sm text-hud-gold-bright transition-colors hover:bg-hud-gold/20 disabled:opacity-40"
+              className="flex min-w-[64px] items-center justify-center gap-1.5 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-4 py-3 text-sm font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30 disabled:opacity-40"
             >
               <Send size={14} />
               {busy ? "…" : "言う"}
@@ -208,7 +229,7 @@ export function SceneView({
               setResponse(it.replyFallback);
               setFreeSent(true);
             }}
-            className="mt-3 text-xs text-hud-text-muted underline underline-offset-4 hover:text-hud-text"
+            className="mt-2 flex min-h-[44px] items-center text-xs text-hud-text-muted underline underline-offset-4 hover:text-hud-text"
           >
             言葉にしないで進む
           </button>
@@ -235,17 +256,25 @@ export function SceneView({
           startedAt={startedAt}
         />
       )}
+
+      <div ref={bottomRef} className="mt-8" />
     </div>
   );
 }
 
-function ContinueButton({ onClick }: { onClick: () => void }) {
+function ContinueButton({
+  onClick,
+  label = "つづきへ",
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
   return (
     <button
       onClick={onClick}
-      className="beat-in mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/10 px-6 py-3 text-hud-gold-bright transition-colors hover:bg-hud-gold/20"
+      className="beat-in mt-4 flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
     >
-      つづきへ
+      {label}
       <ChevronRight size={16} />
     </button>
   );
@@ -273,7 +302,7 @@ function EndingExtras({
       </p>
       {/* 作戦記録 */}
       <div className="rounded-md border border-hud-border bg-hud-panel/60 p-3">
-        <p className="mb-2 font-mono-hud text-[9px] tracking-[0.3em] text-hud-gold-dim">
+        <p className="mb-2 font-mono-hud text-[10px] tracking-[0.3em] text-hud-gold-dim">
           MISSION RECORD
         </p>
         <dl className="space-y-1 text-xs text-hud-text-muted">
@@ -302,7 +331,7 @@ function EndingExtras({
       </p>
       <button
         onClick={onRestart}
-        className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-border bg-hud-panel px-6 py-3 text-sm text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
+        className="flex w-full items-center justify-center gap-1 rounded-md border border-hud-border bg-hud-panel px-6 py-3.5 text-sm text-hud-text transition-colors hover:border-hud-gold/60 hover:text-hud-gold-bright"
       >
         もう一度遊ぶ
       </button>

@@ -90,6 +90,12 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
   // ── 超高速突入 → 戦闘 ────────────────────
   await screen.findByText("超高速突入");
   for (let guard = 0; guard < 60; guard++) {
+    // 本文の下に出る交戦開始ボタン。押すと戦闘UIがマウントされる
+    const engage = screen.queryByRole("button", { name: /ザイラに交戦する/ });
+    if (engage) {
+      await tap(engage);
+      continue;
+    }
     const end = screen.queryByRole("button", { name: /エンディングへ/ });
     if (end) {
       await tap(end);

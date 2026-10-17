@@ -1,86 +1,58 @@
-# 公開手順 — avandner-trial
+# 体験版の公開と当日の使い方
 
-体験版をイベント当日に使える状態にする手順。作業はこの順で行う。
+## 2026年10月17日の準備
 
-2026年10月16日に、GitHubの名前と公開先を `avandner-trial` へ変更した。新しいURLは `https://mayonaka-ratori.github.io/avandner-trial/`。旧URL `https://mayonaka-ratori.github.io/avandnar-trial/` は移転案内を表示し、5秒後に新しいURLへ移動する。旧名のリポジトリには案内用のファイルだけを置く。
+公開先は https://mayonaka-ratori.github.io/avandner-trial/ です。
+明日のイベント向けには、GitHub Pagesで用意済みの文章を使って遊べる形にします。
+AIによる文章の生成がなくても、選択、自由入力、戦闘、エンディングまで進めます。
+自由入力への返答には用意済みの文章を使います。
 
-## 1. GitHub に push する
+手元で行ったボタンの拡大、戦闘を始めるボタンの追加、文字の見やすさの調整も含めて公開します。
 
-```bash
-cd C:\tools\avandner-trial
-git init
-git add -A
-git commit -m "initial: 体験版アプリ"
-gh repo create avandner-trial --private --source=. --push
-```
+## GitHub Pagesで更新する
 
-リポジトリは private でよい（GitHub Pages は private リポジトリでも
-公開されるのは Pages の成果物だけ。ただし無料枠では private リポジトリの
-Pages が使えないことがある。その場合は public にするか、Free プランの
-制約を確認する）。
+`main` に変更を送ると、`.github/workflows/deploy.yml` が検査と公開を行います。
+GitHubのActions画面で「Deploy to GitHub Pages」が成功したことを確認してください。
 
-## 2. GitHub Pages を有効にする
+文章を生成するサーバーのURLを設定していない場合は、サーバーへの通信を行いません。
+最初に長く待たされず、用意済みの文章で遊べます。
+この状態では、Vercel側の終了設定も使いません。公開を止めるときはGitHubの
+Settings → Pages → Unpublish siteを使ってください。
 
-1. リポジトリの **Settings → Pages**
-2. **Source** を「GitHub Actions」にする
-3. main へ push すると `.github/workflows/deploy.yml` が動き、
-   `https://mayonaka-ratori.github.io/avandner-trial/` に出る
+QRコードは次のコマンドで作れます。公開先を変えない限り、印刷済みのQRも使えます。
 
-## 3. Vercel に API を置く
-
-1. Vercel にログイン → **Add New → Project**
-2. `avandner-trial` リポジトリを Import
-3. Build の設定:
-   - Framework Preset: **Vite**（そのままでよい。Vercel 側でもビルドされるが害はない）
-4. **Environment Variables** に 2 つ設定:
-   - `OPENAI_API_KEY` = OpenAI の API キー
-   - `TRIAL_ENABLED` = `true`
-   - （任意）`OPENAI_MODEL` = `gpt-4o-mini`（変更したいときだけ）
-   - 注意: `OPENAI_MODEL` を gpt-5 系など新しい系統に変えると、
-     `max_tokens` パラメータを受け付けず API が全滅することがある
-     （あちらは `max_completion_tokens` を使う）。変えたら必ず
-     動作確認をすること。失敗してもアプリは予備文章で動き続ける
-5. Deploy → `https://avandner-trial.vercel.app/api/status` を開き、
-   `{"enabled":true}` が返れば OK
-
-**知っておくこと:**
-
-- `https://avandner-trial.vercel.app/` を直接開いてもゲーム画面が動く
-  （Vercel がフロントもビルドするため）。CORS はこの直アクセスを
-  防げないが、キルスイッチ `TRIAL_ENABLED` は共通で効くので実害はない
-- `/api/narrate` には簡易レート制限（IP あたり 30 回/分）を入れてあるが、
-  edge の仕組み上「同一インスタンス内」でしか効かない。必ず下の
-  「費用の目安」にある OpenAI 側の利用上限も設定しておくこと
-
-画面側の API 呼び先は既定で `https://avandner-trial.vercel.app`。
-別名にした場合は build 時に環境変数 `VITE_API_BASE` を設定する
-（GitHub Actions の build ステップに `env:` で渡す）。
-
-## 4. 動作確認
-
-- `https://mayonaka-ratori.github.io/avandner-trial/` をスマホで開く
-- 最初から最後まで通す（選択・自由入力・戦闘・リトライ・エンディング）
-- 機内モードにしてリロード → 「簡易モード」のまま予備文章で最後まで遊べることを確認
-- 予備文章で全文が読めるか、開発者モードで API を止めて確認する
-
-## 5. QR コード
-
-```bash
+```powershell
 npm run qr
 ```
 
-`qr.png` ができる。ブースのポップに印刷して貼る。
+`qr.png` が印刷用の画像です。
 
-## 6. イベント終了後
+## 当日の確認
 
-- Vercel の環境変数 `TRIAL_ENABLED` を `false` に変更して Redeploy
-  → 画面を開くと「イベント会場限定」の案内だけが出る
-- 完全に止めたい場合は Vercel プロジェクトを削除し、Pages も無効化する
+1. スマホのモバイル回線で公開先を開く。
+2. 「物語をはじめる」から進み、選択肢、自由入力、戦闘を試す。
+3. エンディングの「もう一度遊ぶ」で最初に戻れることを確かめる。
 
-## 費用の目安
+画面の読み込みにはインターネット接続が必要です。
+通信を切った状態での再読み込みには対応していません。
+文章を生成するサーバーが止まっても遊べることと、通信なしで画面を開けることは別です。
 
-- OpenAI gpt-4o-mini: 1 回の体験あたり約 4,000 出力トークン。
-  100 人が遊んでも数円〜十数円程度
-- **推奨**: OpenAI のダッシュボード（Settings → Billing → Limits）で
-  月額上限を設定しておく。API を外部から叩かれても課金が青天井にならない
-- Vercel Hobby・GitHub Pages: 無料枠で足りる想定
+## AIによる文章の生成を追加する場合
+
+1. Vercelで `mayonaka-ratori/avandner-trial` を取り込む。
+2. 環境変数 `OPENAI_API_KEY` と `TRIAL_ENABLED=true` を設定して公開する。
+3. `VITE_API_BASE` を空文字にする。同じ公開先の `/api/` を呼びます。
+4. `vercel.json` がVercel用のファイルの置き場所を指定します。画面は `/` で開けます。
+5. Vercelの公開URLの `/api/status` が `{"enabled":true}` を返すことと、実際に文章が生成されることを確認する。
+6. GitHubのSettings → Secrets and variables → Actions → Variablesに
+   `VITE_API_BASE` を登録し、値にVercelの公開URLを入れる。末尾の `/` は付けない。
+7. GitHub Actionsの「Deploy to GitHub Pages」を手動で実行する。
+
+これでGitHub Pages側も文章の生成を使います。
+APIキーはVercelにだけ置いてください。`VITE_` から始まる名前には入れないでください。
+
+AIの文章生成を使う公開では、`TRIAL_ENABLED=false` に変えてVercelで再公開すると、
+新しく開いた画面に終了案内が出ます。ただし、サーバーに接続できない場合は用意済みの文章で進めます。
+確実に公開を止めたいときはGitHub Pagesも停止してください。
+
+GitHub Pagesだけの形に戻すときは、GitHub側の `VITE_API_BASE` を削除し、再公開します。
