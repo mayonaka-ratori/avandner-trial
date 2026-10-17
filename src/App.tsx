@@ -206,11 +206,7 @@ export default function App() {
 
   return (
     <main className="min-h-dvh">
-      <SystemChrome status={scene.kicker ?? undefined} />
-      {/* 覚醒シーンだけ白フラッシュから入る（培養槽を開けた瞬間の光） */}
-      {scene.id === "awakening" && (
-        <div className="pointer-events-none fixed inset-0 z-50 wake-flash" aria-hidden="true" />
-      )}
+      <SystemChrome status={scene.kicker ?? undefined} reading />
       <div key={scene.id} className="scene-in">
         <SceneView
           scene={scene}

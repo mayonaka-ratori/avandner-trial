@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StoryText } from "./StoryText";
 
 interface NarrationProps {
   paragraphs: string[];
@@ -104,10 +105,10 @@ export function Narration({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 py-8 text-hud-text-muted">
+      <div role="status" className="flex items-center gap-3 py-8 text-hud-text-muted">
         <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-hud-gold" />
-        <span className="font-mono-hud text-sm tracking-[0.15em]">
-          応答を解析中…
+        <span className="text-sm">
+          文章を準備しています…
         </span>
       </div>
     );
@@ -119,8 +120,8 @@ export function Narration({
     <div
       className={
         done
-          ? "space-y-4"
-          : "space-y-4 rounded-sm focus:outline-none focus:ring-1 focus:ring-hud-gold/50"
+          ? "story-text"
+          : "story-text rounded-sm focus:outline-none focus:ring-1 focus:ring-hud-gold/50"
       }
       onClick={() => setCount(total)}
       onKeyDown={
@@ -143,13 +144,13 @@ export function Narration({
         if (shown === 0) return null;
         const typing = shown < p.length;
         return (
-          <p key={i} className="leading-relaxed text-hud-text">
-            {p.slice(0, shown)}
+          <div key={i} className="story-paragraph">
+            <StoryText text={p.slice(0, shown)} />
             {typing && <span className="type-caret" aria-hidden="true" />}
             {!typing && !done && i === lastVisible(paragraphs, count) && (
               <span className="type-caret" aria-hidden="true" />
             )}
-          </p>
+          </div>
         );
       })}
       {/* タイピング中だけ出すスキップ案内。タップ対象は親の領域全体 */}
@@ -158,7 +159,7 @@ export function Narration({
           className="pt-1 text-right font-mono-hud text-[11px] tracking-[0.2em] text-hud-gold-dim"
           aria-hidden="true"
         >
-          TAP TO SHOW ALL ▶▶
+          押すと全文を表示します
         </p>
       )}
     </div>

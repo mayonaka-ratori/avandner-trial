@@ -1,12 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronRight, Send } from "lucide-react";
 import type { ChoiceOption, ChoiceRecord, SceneDef } from "@/scenes/types";
 import { narrate } from "@/api/client";
 import { endingExtras } from "@/scenes/scenes";
 import { Narration } from "./Narration";
+import { StoryInline } from "./StoryText";
 
-/** テスト環境ではタイプライターを即時完了させる（vitest は MODE=test） */
-const INSTANT_TEXT = import.meta.env.MODE === "test";
+const TEXT_SIZE_KEY = "avandner-trial-large-text";
+
+function loadLargeText(): boolean {
+  try {
+    return localStorage.getItem(TEXT_SIZE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 interface SceneViewProps {
   scene: SceneDef;
@@ -31,7 +39,7 @@ interface SceneViewProps {
 /**
  * 1 場面の表示。narrationKey があれば LLM の語りを取り、
  * 失敗したら fallback の文章に切り替える。
- * 本文はタイプライターで出し、出し切ってから操作を見せる。
+ * 本文は全文表示し、文ごとの改行と台詞の区別を共通の表示部品で行う。
  */
 export function SceneView({
   scene,
@@ -51,7 +59,9 @@ export function SceneView({
   const [freeSent, setFreeSent] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [busy, setBusy] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [largeText, setLargeText] = useState(loadLargeText);
+  const responseRef = useRef<HTMLDivElement>(null);
+  const inputId = useId();
 
   const it = scene.interaction;
 
@@ -104,11 +114,22 @@ export function SceneView({
   // 操作の表示は「本文が出て、さらに応答文も出し切ってから」
   const ready = revealed && (response.length === 0 || responseRevealed);
 
-  // 応答文が差し込まれたとき・操作（ボタン/入力欄）が出現したときに下までスクロール。
-  // 本文が長いと操作が画面外に出るため、出現を見せるために一度だけ下へ誘導する
+  // 選択や送信の後は返事の先頭へ。本文や操作が表示されるだけでは動かさない。
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [response, freeSent, ready]);
+    if (response.length === 0 || !responseRevealed) return;
+    responseRef.current?.focus({ preventScroll: true });
+    responseRef.current?.scrollIntoView({ block: "start" });
+  }, [response, responseRevealed]);
+
+  function toggleLargeText() {
+    const next = !largeText;
+    setLargeText(next);
+    try {
+      localStorage.setItem(TEXT_SIZE_KEY, String(next));
+    } catch {
+      // 保存できなくても、この場面では切り替えられる。
+    }
+  }
 
   async function submitFree() {
     const input = freeText.trim();
@@ -135,7 +156,8 @@ export function SceneView({
 
   return (
     <div
-      className={`mx-auto flex w-full max-w-xl flex-col px-5 pb-8 pt-10 safe-area-bottom ${
+      data-large-text={largeText}
+      className={`scene-reader mx-auto flex w-full max-w-xl flex-col px-5 pb-8 pt-10 safe-area-bottom ${
         // combat は本文の下に戦闘UIが続くので、1画面分の空白を作らない
         it.type === "combat" ? "" : "min-h-dvh"
       }`}
@@ -145,22 +167,26 @@ export function SceneView({
           {scene.alert}
         </p>
       )}
-      <h2 className="mb-6 mt-1 border-b border-hud-border pb-3 text-xl text-hud-heading">
-        {scene.title}
-      </h2>
+      <div className="scene-heading">
+        <h2 className="text-xl text-hud-heading">{scene.title}</h2>
+        <button type="button" className="reading-size-button" aria-pressed={largeText} onClick={toggleLargeText}>
+          文字を大きく
+        </button>
+      </div>
 
       <Narration
         paragraphs={paragraphs}
         loading={text === null}
-        instant={INSTANT_TEXT}
+        instant
         onRevealed={() => setRevealed(true)}
       />
 
       {response.length > 0 && (
-        <div className="mt-4 border-l-2 border-hud-gold/40 pl-4">
+        <div ref={responseRef} tabIndex={-1} role="region" aria-label="返事" className="story-response">
+          <p className="mb-3 text-sm text-hud-text-muted">返事</p>
           <Narration
             paragraphs={response}
-            instant={INSTANT_TEXT}
+            instant
             onRevealed={() => setResponseRevealed(true)}
           />
         </div>
@@ -175,7 +201,8 @@ export function SceneView({
       )}
 
       {revealed && it.type === "choice" && picked === null && (
-        <div className="mt-2 space-y-3">
+        <div role="group" aria-label="返答を選ぶ" className="scene-actions space-y-3">
+          <p className="text-sm text-hud-text-muted">どう答えますか？</p>
           {it.options.map((opt, i) => (
             <button
               key={opt.id}
@@ -189,7 +216,7 @@ export function SceneView({
                   className="mt-0.5 shrink-0 text-hud-gold-dim"
                   aria-hidden="true"
                 />
-                <span>{opt.label}</span>
+                <span><StoryInline text={opt.label} /></span>
               </span>
             </button>
           ))}
@@ -201,16 +228,16 @@ export function SceneView({
       )}
 
       {revealed && it.type === "free" && !freeSent && (
-        <div className="mt-2">
-          <p className="mb-1 font-mono-hud text-[11px] tracking-[0.3em] text-hud-gold-dim">
-            &gt; VOICE OUT
-          </p>
-          <p className="mb-2 text-sm font-medium text-hud-text">{it.prompt}</p>
+        <div className="scene-actions">
+          <label htmlFor={inputId} className="mb-3 block font-medium text-hud-heading">{it.prompt}</label>
           <div className="flex gap-2">
             <input
+              id={inputId}
               value={freeText}
               onChange={(e) => setFreeText(e.target.value.slice(0, 200))}
-              onKeyDown={(e) => e.key === "Enter" && submitFree()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) void submitFree();
+              }}
               placeholder={it.placeholder}
               className="min-w-0 flex-1 rounded-md border border-hud-border bg-hud-panel px-3 py-3 text-base text-hud-text placeholder:text-hud-text-muted/70 focus:border-hud-gold/60 focus:outline-none"
             />
@@ -220,7 +247,7 @@ export function SceneView({
               className="flex min-w-[64px] items-center justify-center gap-1.5 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-4 py-3 text-sm font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30 disabled:opacity-40"
             >
               <Send size={14} />
-              {busy ? "…" : "言う"}
+              {busy ? "送信中" : "言う"}
             </button>
           </div>
           <button
@@ -257,7 +284,6 @@ export function SceneView({
         />
       )}
 
-      <div ref={bottomRef} className="mt-8" />
     </div>
   );
 }
@@ -272,7 +298,7 @@ function ContinueButton({
   return (
     <button
       onClick={onClick}
-      className="beat-in mt-4 flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
+      className="mt-8 flex w-full items-center justify-center gap-1 rounded-md border border-hud-gold/50 bg-hud-gold/20 px-6 py-3.5 font-medium text-hud-gold-bright transition-colors hover:bg-hud-gold/30"
     >
       {label}
       <ChevronRight size={16} />

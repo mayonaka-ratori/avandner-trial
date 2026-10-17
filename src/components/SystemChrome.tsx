@@ -3,13 +3,15 @@
  * 格子テクスチャ・走査線・周辺減光・四隅のブラケット・上部のステータス行で
  * 構成する。すべて pointer-events: none で、操作には一切干渉しない。
  */
-export function SystemChrome({ status }: { status?: string }) {
+export function SystemChrome({ status, reading = false }: { status?: string; reading?: boolean }) {
   return (
     <>
       {/* 格子＋走査線＋周辺減光 */}
-      <div className="pointer-events-none fixed inset-0 z-40 hud-grid" aria-hidden="true" />
-      <div className="pointer-events-none fixed inset-0 z-40 hud-scanline" aria-hidden="true" />
-      <div className="pointer-events-none fixed inset-0 z-40 hud-vignette" aria-hidden="true" />
+      {!reading && <>
+        <div className="pointer-events-none fixed inset-0 z-40 hud-grid" aria-hidden="true" />
+        <div className="pointer-events-none fixed inset-0 z-40 hud-scanline" aria-hidden="true" />
+        <div className="pointer-events-none fixed inset-0 z-40 hud-vignette" aria-hidden="true" />
+      </>}
 
       {/* 四隅のブラケット */}
       <Corner className="left-2 top-2 border-l border-t" />
@@ -18,7 +20,7 @@ export function SystemChrome({ status }: { status?: string }) {
       <Corner className="bottom-2 right-2 border-b border-r" />
 
       {/* 上部ステータス行 */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 pt-1.5">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-hud-bg px-4 pt-1.5 pb-1">
         <span className="font-mono-hud text-[9px] tracking-[0.25em] text-hud-gold-dim/80">
           AVANDNER // GEODESIC SPHERE
         </span>

@@ -117,8 +117,8 @@ describe("Narration（タイプライター）", () => {
     expect(screen.getByText("かきくけこ")).toBeInTheDocument();
   });
 
-  it("loading 中は解析中の表示になる", () => {
+  it("loading 中は準備中の表示になる", () => {
     render(<Narration paragraphs={[]} loading />);
-    expect(screen.getByText(/解析中/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("文章を準備しています");
   });
 });

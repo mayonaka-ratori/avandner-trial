@@ -23,7 +23,7 @@
   --color-hud-border: rgba(122, 98, 32, 0.45);
   --color-hud-warning: #ff6f4d;
   --font-mono-hud: "Consolas", "Menlo", "Noto Sans Mono", "Courier New",
-    monospace;
+    "Hiragino Sans", "Noto Sans JP", "Yu Gothic", "Meiryo", monospace;
 }
 
 html {
@@ -33,7 +33,101 @@ html {
 body {
   @apply bg-hud-bg text-hud-text;
   font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
-    "Yu Gothic", sans-serif;
+    "Yu Gothic", "Meiryo", sans-serif;
+}
+
+/* 物語の本文は日本語のゴシック体で表示し、装飾を重ねない。 */
+.scene-reader {
+  --story-font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.scene-reader.safe-area-bottom {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+}
+
+.scene-reader[data-large-text="true"] {
+  --story-font-size: 1.25rem;
+}
+
+.scene-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-hud-border);
+}
+
+.reading-size-button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-hud-border);
+  border-radius: 0.375rem;
+  color: var(--color-hud-text);
+  background: var(--color-hud-panel);
+  font-size: 0.875rem;
+}
+
+.reading-size-button[aria-pressed="true"] {
+  border-color: var(--color-hud-gold);
+  color: var(--color-hud-gold-bright);
+}
+
+.story-text {
+  font-size: var(--story-font-size, 1.0625rem);
+  line-height: 1.95;
+  line-break: strict;
+  color: var(--color-hud-text);
+}
+
+.story-paragraph + .story-paragraph,
+.story-paragraph > p + p {
+  margin-top: 1.5rem;
+}
+
+.story-sentence {
+  display: block;
+  white-space: pre-line;
+}
+
+.story-sentence + .story-sentence {
+  margin-top: 0.3em;
+}
+
+.story-name {
+  font-weight: 700;
+  color: var(--color-hud-gold-bright);
+  white-space: nowrap;
+}
+
+.story-dialogue {
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--color-hud-gold);
+  border-radius: 0 0.375rem 0.375rem 0;
+  background: #211e15;
+  color: var(--color-hud-heading);
+  font-style: normal;
+}
+
+.scene-actions,
+.story-response {
+  margin-top: 2rem;
+  border-top: 1px solid var(--color-hud-border);
+  padding-top: 1.5rem;
+}
+
+.story-response {
+  scroll-margin-top: 3rem;
+}
+
+button:focus-visible,
+input:focus-visible,
+.story-response:focus-visible {
+  outline: 2px solid var(--color-hud-gold-bright);
+  outline-offset: 4px;
 }
 
 /* 段落を順番にふわっと出す */

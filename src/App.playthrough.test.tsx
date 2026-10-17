@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
@@ -164,7 +164,7 @@ async function pickChoice(
 ) {
   // 選択肢は border-hud-border のボタン。見出し等と区別するため
   // 「つづきへ」が出るまで choice ボタンを探す
-  const buttons = await scr.findAllByRole("button");
+  const buttons = within(await scr.findByRole("group", { name: "返答を選ぶ" })).getAllByRole("button");
   const labels = buttons
     .map((b) => b.textContent ?? "")
     .filter((t) => t !== "" && !/つづきへ/.test(t));
