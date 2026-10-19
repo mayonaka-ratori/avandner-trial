@@ -24,14 +24,14 @@ interface PlayPattern {
   prebattleWords: string;
   /** 選択肢の label を受け取って、押すボタンの label を返す */
   pick: (labels: string[]) => string;
-  attack: () => "slash" | "double" | "charge";
+  attack: () => "slash" | "double";
+  overdrive?: boolean;
   evade: boolean;
 }
 
 const ATTACK_LABEL = {
   slash: /黒絢で斬る/,
   double: /ダブルトリガー/,
-  charge: /チャージアタック/,
 } as const;
 
 /** fetch を全部失敗させる＝API が死んでいて予備文章だけで動く状態 */
@@ -47,6 +47,7 @@ beforeEach(() => {
     vi.fn().mockRejectedValue(new Error("network down")),
   );
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -111,7 +112,7 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
       await tap(roll);
       continue;
     }
-    const commitCharge = screen.queryByRole("button", { name: "突入する" });
+    const commitCharge = screen.queryByRole("button", { name: "範囲外へ移動する" });
     if (commitCharge) {
       await tap(commitCharge);
       continue;
@@ -127,7 +128,8 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
       await tap(retry);
       continue;
     }
-    const evade = screen.queryByRole("button", { name: /ジグスラストで回避する/ });
+    const options = screen.queryAllByRole("button", { name: /ジグスラストで/ });
+    const evade = options.find((el) => el.textContent?.includes("攻撃範囲の外")) ?? options[0];
     if (evade) {
       // 残りZSがコスト以下だと回避ボタンは無効化されるので受ける側を押す
       const usable = pattern.evade && !(evade as HTMLButtonElement).disabled;
@@ -143,10 +145,13 @@ async function runThrough(pattern: PlayPattern): Promise<RunStats> {
       await tap(next);
       continue;
     }
-    // 攻撃ボタン。チャージ中は「黒絢を振り下ろす」しか出ないので順に探す
+    if (pattern.overdrive) {
+      const route = screen.queryByRole("radio", { name: /超過移動で/ });
+      if (route && !(route as HTMLInputElement).disabled) await tap(route);
+    }
+    // 攻撃を選ぶ
     const candidates = [
       ATTACK_LABEL[pattern.attack()],
-      /振り下ろす/,
       /黒絢で斬る/,
     ];
     const attack = candidates
@@ -213,14 +218,15 @@ describe("予備文章版ランスルー", () => {
   );
 
   it(
-    "B: 最適解型 — チャージアタック連打、回避なし",
+    "B: 移動重視型 — 超過移動で威力を増やす、回避なし",
     async () => {
       const stats = await runThrough({
         name: "optimizer",
         firstWords: "はい",
         prebattleWords: "了解",
         pick: (labels) => labels[0],
-        attack: () => "charge",
+        attack: () => "slash",
+        overdrive: true,
         evade: false,
       });
       expect(stats.endingReached).toBe(true);

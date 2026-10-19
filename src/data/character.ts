@@ -19,13 +19,8 @@ export const KUROAYA = {
   criticalTriggerBonus: 10,
 } as const;
 
-/** チャージアタックの威力倍率（【チャージアタック：×３】）
- *
- * 体験版では「1 ターン目に突入（無防備・回避不可）→ 2 ターン目に解放」の
- * 2 ターン行動として実装する。原作の「長距離移動で威力向上」の再現で、
- * コストは無防備になる時間そのもの。
- */
-export const CHARGE_ATTACK_MULTIPLIER = 3;
+/** 黒絢の【チャージアタック：×３】。この手番の移動セル数×3を威力へ加算。 */
+export const CHARGE_ATTACK_PER_CELL = 3;
 
 /** ダブルトリガーの目標値ペナルティ（−2） */
 export const DOUBLE_TRIGGER_PENALTY = 2;
@@ -58,7 +53,7 @@ export interface ZairaAttack {
   burst: number;
   target: number;
   power: number;
-  /** 座標攻撃はジグスラストで回避できない（ペナルティを受けない） */
+  /** 座標攻撃は範囲外へ移動すれば外れる。範囲内では回避による目標値の低下なし。 */
   coordinateAttack: boolean;
 }
 
@@ -75,7 +70,7 @@ export const ZAIRA_ATTACKS: ZairaAttack[] = [
   {
     id: "machine-gun",
     label: "機銃掃射",
-    flavor: "EF本体から機銃の掃射。面を制圧する弾幕はジグスラストでは避けられない。",
+    flavor: "ザイラが狙ったセルへ機銃を掃射する。",
     burst: 6,
     target: 6,
     power: 6,

@@ -15,21 +15,21 @@ export function TenSidedDie({ value, success, critical = false, rolling = false 
 export function BattleDice({ judgement: j }: { judgement: AttackJudgement }) {
   return (
     <div className="battle-dice-result">
-      <p>10面ダイス{j.burst}個・<strong>{j.effectiveTarget}以下</strong>で成功{j.extraDice > 0 && `（追加${j.extraDice}個）`}</p>
+      <p>10面ダイス{j.burst}個・<strong>{j.effectiveTarget}以下</strong>で成功{j.extraDice > 0 && `（振り足し${j.extraDice}個）`}</p>
       <ul className="battle-dice-list" aria-label="ダイスの出目">
         {j.dice.map((die, i) => (
           <li key={i} aria-label={`出目${die.value}、${die.isCritical ? "クリティカル" : die.isSuccess ? "成功" : "失敗"}${die.wave > 0 ? `、振り足し${die.wave}回目` : ""}`}>
             <TenSidedDie value={die.value} success={die.isSuccess} critical={die.isCritical} />
-            <span>{die.isCritical ? "追加" : die.isSuccess ? "成功" : "失敗"}</span>
+            <span>{die.isCritical ? "成功＋振り足し" : die.isSuccess ? "成功" : "失敗"}</span>
           </li>
         ))}
       </ul>
       <p className="battle-calculation">成功{j.successes}個 × 威力{j.power ?? 0}
-        {j.criticalBonusDamage > 0 && ` ＋ 追加${j.criticalBonusDamage}`}
+        {j.criticalBonusDamage > 0 && ` ＋ 黒絢の追加ダメージ${j.criticalBonusDamage}`}
         {j.damageReduction > 0 && ` − 軽減${j.damageReduction}`}
         {` → ${j.appliedDamage ?? 0}ダメージ`}
       </p>
-      {j.criticals > 0 && <p>出目1はクリティカル。成功として数え、追加でダイスを振っています。</p>}
+      {j.criticals > 0 && <p>出目1はクリティカル。成功として数え、ダイスを1個振り足します。{j.criticalTriggerBonus > 0 && `黒絢の効果で、出目1が1個につきダメージも${j.criticalTriggerBonus}増えます。`}</p>}
     </div>
   );
 }

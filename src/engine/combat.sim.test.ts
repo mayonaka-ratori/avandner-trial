@@ -1,16 +1,7 @@
-/**
- * combat.sim.test.ts — 戦闘バランスのモンテカルロ
- *
- * 各戦法で何ラウンドで終わるか・どれくらい負けるかを数える。
- * 体験版は 5〜10 分想定なので、決着は 3〜6 ラウンド・敗北率は
- * 「全力ミスプレイでも 2 回に 1 回は負けない」あたりが目安。
- * チャージアタック中（charging）は選択肢が「解放」だけなので、
- * 戦法関数には state を渡して整合させる。
- */
-
+/** 移動・回避の有無で勝率が変わり、長すぎる戦闘にならないことを確認する。 */
 import { describe, expect, it } from "vitest";
+import { evadeRoutes, inAttackArea } from "./position";
 import {
-  attackOptionsFor,
   createCombat,
   nextRound,
   playerAttack,
@@ -34,6 +25,7 @@ function simulate(
   attack: Strategy,
   evade: EvadePolicy,
   trials = 500,
+  routeId = "direct",
 ): SimResult {
   let wins = 0;
   let losses = 0;
@@ -41,17 +33,18 @@ function simulate(
   let maxRounds = 0;
   let minRounds = Infinity;
 
+  let seed = 12345;
+  const rng = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   for (let i = 0; i < trials; i++) {
     let s: CombatState = createCombat();
     let guard = 0;
     while (s.phase !== "won" && s.phase !== "lost" && guard < 40) {
       if (s.phase === "player-turn") {
-        const legal = attackOptionsFor(s).map((o) => o.mode);
-        let mode = attack(s);
-        if (!legal.includes(mode)) mode = legal[0];
-        s = playerAttack(s, mode);
-      } else if (s.phase === "evade-prompt" || s.phase === "enemy-ready") {
-        s = resolveEnemyAttack(s, evade(s));
+        s = playerAttack(s, attack(s), rng, s.pcZs <= 3 ? "direct" : routeId);
+      } else if (s.phase === "evade-prompt") {
+        const routes = evadeRoutes(s.approachHour);
+        const safe = routes.find((r) => !inAttackArea(r.path[r.path.length - 1], s.incomingCells)) ?? routes[0];
+        s = resolveEnemyAttack(s, evade(s) && s.pcZs > 3 ? safe.id : "stay", rng);
       } else if (s.phase === "enemy-resolved") {
         s = nextRound(s);
       }
@@ -87,32 +80,22 @@ describe("戦闘バランス（500試行ずつ）", () => {
     const slashEvade = simulate(() => "slash", () => true);
     const slashNoEvade = simulate(() => "slash", () => false);
     const doubleEvade = simulate(() => "double", () => true);
-    const chargeSpam = simulate(() => "charge", () => true);
+    const overdriveEvade = simulate(() => "slash", () => true, 500, "overdrive");
     const slashLowHpEvade = simulate(
       () => "slash",
       (s) => s.pcZs < 30,
-    );
-    const alternate = simulate(
-      (s) => (s.round % 2 === 1 ? "charge" : "release"),
-      () => true,
     );
 
     report("通常攻撃・回避あり", slashEvade);
     report("通常攻撃・回避なし", slashNoEvade);
     report("ダブルトリガー・回避あり", doubleEvade);
-    report("チャージ連打", chargeSpam);
+    report("超過移動・回避あり", overdriveEvade);
     report("通常＋瀕死(ZS<30)のみ回避", slashLowHpEvade);
-    report("交互にチャージと通常", alternate);
 
-    // 乱数シミュレーションなので絶対に落ちない広いレンジで、
-    // バランス退行（計算ロジックの破壊的変更）だけを検出する
     const winRate = (r: SimResult) => r.wins / (r.wins + r.losses);
-    expect(winRate(slashEvade)).toBeGreaterThanOrEqual(0.55);
-    expect(winRate(slashEvade)).toBeLessThanOrEqual(0.95);
-    expect(winRate(slashNoEvade)).toBeGreaterThanOrEqual(0.2);
-    expect(winRate(slashNoEvade)).toBeLessThanOrEqual(0.75);
-    expect(winRate(chargeSpam)).toBeGreaterThanOrEqual(0.3);
-    expect(winRate(chargeSpam)).toBeLessThanOrEqual(0.85);
+    expect(winRate(slashEvade)).toBeGreaterThanOrEqual(0.65);
+    expect(winRate(slashEvade)).toBeGreaterThan(winRate(slashNoEvade));
+    expect(winRate(overdriveEvade)).toBeGreaterThanOrEqual(0.65);
     expect(slashEvade.avgRounds).toBeGreaterThanOrEqual(2);
     expect(slashEvade.avgRounds).toBeLessThanOrEqual(8);
   });

@@ -5,16 +5,7 @@ import { narrate } from "@/api/client";
 import { endingExtras } from "@/scenes/scenes";
 import { Narration } from "./Narration";
 import { StoryInline } from "./StoryText";
-
-const TEXT_SIZE_KEY = "avandner-trial-large-text";
-
-function loadLargeText(): boolean {
-  try {
-    return localStorage.getItem(TEXT_SIZE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
+import { TEXT_SIZE_KEY, useStoredBoolean } from "@/hooks/useStoredBoolean";
 
 interface SceneViewProps {
   scene: SceneDef;
@@ -59,7 +50,7 @@ export function SceneView({
   const [freeSent, setFreeSent] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [largeText, setLargeText] = useState(loadLargeText);
+  const [largeText, toggleLargeText] = useStoredBoolean(TEXT_SIZE_KEY);
   const responseRef = useRef<HTMLDivElement>(null);
   const inputId = useId();
 
@@ -120,16 +111,6 @@ export function SceneView({
     responseRef.current?.focus({ preventScroll: true });
     responseRef.current?.scrollIntoView({ block: "start" });
   }, [response, responseRevealed]);
-
-  function toggleLargeText() {
-    const next = !largeText;
-    setLargeText(next);
-    try {
-      localStorage.setItem(TEXT_SIZE_KEY, String(next));
-    } catch {
-      // 保存できなくても、この場面では切り替えられる。
-    }
-  }
 
   async function submitFree() {
     const input = freeText.trim();

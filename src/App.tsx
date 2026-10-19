@@ -7,6 +7,8 @@ import { SceneView } from "@/components/SceneView";
 import { BattleView } from "@/components/BattleView";
 import { BootSequence } from "@/components/BootSequence";
 import { SystemChrome } from "@/components/SystemChrome";
+import { createCombat } from "@/engine/combat";
+import { readBattleSave, type BattleSave } from "@/engine/battleSave";
 
 type Phase = "checking" | "title" | "boot" | "playing" | "closed";
 
@@ -16,6 +18,7 @@ interface PlayState {
   battleResult: "won" | "lost-then-won";
   /** 体験開始時刻（エンディングの経過時間表示用） */
   startedAt: number;
+  battle?: BattleSave;
 }
 
 // 英語表記を直しても、保存済みの続きから遊べるよう内部名は変えない。
@@ -54,6 +57,7 @@ function loadSave(): PlayState | null {
         : [],
       battleResult: data.battleResult === "lost-then-won" ? "lost-then-won" : "won",
       startedAt: typeof data.startedAt === "number" ? data.startedAt : Date.now(),
+      battle: data.sceneId === "insertion" ? readBattleSave(data.battle) : undefined,
     };
   } catch {
     return null;
@@ -70,12 +74,13 @@ export default function App() {
     startedAt: Date.now(),
   });
   const [saved, setSaved] = useState<PlayState | null>(null);
-  /** combat シーンで「ザイラに交戦する」が押されたか。押すまで戦闘UIは出さない */
-  const [engaged, setEngaged] = useState(false);
+  const engaged = play.battle !== undefined;
   const battleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     checkStatus().then((status) => {
+      if (cancelled) return;
       if (status === "closed") {
         setPhase("closed");
       } else {
@@ -84,6 +89,7 @@ export default function App() {
         setPhase("title");
       }
     });
+    return () => { cancelled = true; };
   }, []);
 
   const persist = useCallback((p: PlayState) => {
@@ -103,14 +109,12 @@ export default function App() {
     };
     setPlay(fresh);
     persist(fresh);
-    setEngaged(false);
     setPhase("boot");
   }, [persist]);
 
   const resume = useCallback(() => {
     if (!saved) return;
     setPlay(saved);
-    setEngaged(false);
     setPhase("playing");
   }, [saved]);
 
@@ -121,15 +125,23 @@ export default function App() {
           ...prev,
           sceneId: nextSceneId,
           choiceLog: record ? [...prev.choiceLog, record] : prev.choiceLog,
+          battle: undefined,
         };
         persist(next);
         return next;
       });
-      setEngaged(false);
       window.scrollTo({ top: 0 });
     },
     [persist],
   );
+
+  const saveBattle = useCallback((battle: BattleSave) => {
+    setPlay((prev) => {
+      const next = { ...prev, battle };
+      persist(next);
+      return next;
+    });
+  }, [persist]);
 
   // 交戦を始めたら物語を片づけ、戦闘画面の先頭に移る。
   useEffect(() => {
@@ -215,7 +227,7 @@ export default function App() {
           choiceLog={play.choiceLog}
           battleResult={play.battleResult}
           startedAt={play.startedAt}
-          onEngage={() => setEngaged(true)}
+          onEngage={() => saveBattle({ version: 1, state: createCombat(), lostCount: 0, eventStart: 0 })}
           engaged={engaged}
           onAdvance={(record) => {
             if (scene.interaction.type === "ending") {
@@ -239,13 +251,15 @@ export default function App() {
             className="battle-root"
           >
             <BattleView
+              initialSave={play.battle}
+              onSave={saveBattle}
               onEnd={(result) => {
                 setPlay((prev) => {
-                  const next = { ...prev, battleResult: result };
+                  const next = { ...prev, sceneId: "ending", battle: undefined, battleResult: result };
                   persist(next);
                   return next;
                 });
-                advance("ending");
+                window.scrollTo({ top: 0 });
               }}
             />
           </div>
