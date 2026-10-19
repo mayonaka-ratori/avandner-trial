@@ -96,6 +96,10 @@ export function BattleView({ onEnd, initialSave, onSave }: {
   const selectedDefense = pending?.type === "enemy" ? defenseRoutes.find((route) => route.id === pending.defense) : undefined;
   const preview = pending?.type === "enemy" ? selectedDefense?.path : state.phase === "player-turn" ? route.path : undefined;
   const latest = state.log.slice(eventStart);
+  // 出目と被害を先に読む。移動経路や敵の演出文は下の戦闘記録に残す。
+  const outcomes = latest.filter((entry) => entry.judgement);
+  const notices = latest.filter((entry) => !entry.judgement && entry.actor === "system");
+  const approach = state.phase === "evade-prompt" ? latest.filter((entry) => !entry.judgement && entry.actor === "pc") : [];
   const rollInfo = pending ? describeRoll(state, pending) : null;
 
   return (
@@ -117,7 +121,7 @@ export function BattleView({ onEnd, initialSave, onSave }: {
       <p className="battle-step" role="status" aria-live="polite">{rolling ? "10面ダイスを振っています…" : phaseLabel(state)}</p>
       <section ref={resultRef} tabIndex={-1} className="battle-latest" aria-label="直前の結果">
         <h3>{state.log.length === 1 ? "戦闘の目的" : "直前の結果"}</h3>
-        {latest.map((entry, i) => <ResultEntry key={`${eventStart}-${i}`} entry={entry} />)}
+        {[...outcomes, ...notices, ...approach].map((entry, i) => <ResultEntry key={`${eventStart}-${i}`} entry={entry} />)}
       </section>
       <section ref={controlsRef} className="battle-controls" aria-label="次の行動">
         <fieldset disabled={rolling}>
